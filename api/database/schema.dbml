@@ -1,0 +1,759 @@
+// ============================================
+// "Allt om"-plattformen – databasschema v3
+// Klistra in på https://dbdiagram.io
+//
+// Nytt i v3 (efter genomgång):
+//  - business_user (pivot) ersätter businesses.user_id
+//    → flera användare kan hantera samma verksamhet
+//  - deleted_at på business_locations
+//  - pages-tabell för statiska sidor (Om oss, Kontakt, policy)
+//  - Noteringar om soft delete + unika slugs (partiellt index i Postgres)
+//  - Revisions utökad med Page; notering om att spara godkända
+//    revisioner som versionshistorik
+//
+// IMPLEMENTATIONSNOT – enums:
+// Enum-blocken nedan är dokumentation. I Laravel-migrations:
+// använd varchar + backed enums i PHP (ContentStatus::Published),
+// INTE databasens ENUM-typ – nya värden ska vara en kodrad,
+// inte en migration.
+//
+// DATABASREKOMMENDATION: PostgreSQL.
+// Skälen: partiella unika index (löser soft delete + unika slugs)
+// och jsonb med index för alla översättningsbara fält.
+// ============================================
+
+// ---------- Enums (dokumentation, implementeras som varchar) ----------
+
+Enum content_status {
+  draft
+  pending
+  published
+  rejected
+  archived
+}
+
+Enum site_status {
+  active
+  coming_soon
+  hidden
+}
+
+Enum managed_by {
+  self
+  editorial
+}
+
+Enum category_type {
+  business
+  event
+  sport [note: 'Fotboll, ishockey, innebandy ... – används av framtida sportmodulen']
+}
+
+Enum revision_status {
+  pending
+  approved
+  rejected
+}
+
+Enum promotion_placement {
+  startsida
+  kategorisida
+  evenemangskalender
+  nyhetsbrev
+}
+
+// ============================================
+// GEOGRAFI
+// ============================================
+
+Table lan {
+  id bigint [pk, increment]
+  namn varchar [note: '"Dalarnas län"']
+  kod char(2) [unique, note: 'SCB länskod, "20"']
+}
+
+Table kommuner {
+  id bigint [pk, increment]
+  lan_id bigint [not null]
+  namn varchar [note: '"Ludvika"']
+  kod char(4) [unique, note: 'SCB kommunkod, "2085"']
+  slug varchar [unique]
+  lat decimal(10,7)
+  lng decimal(10,7)
+
+  Note: 'Seedas från SCB. Koordinater för SMHI-vädret.'
+}
+
+Table sites {
+  id bigint [pk, increment]
+  kommun_id bigint [not null, unique, note: 'En sajt per kommun']
+  namn varchar [note: '"Allt om Ludvika"']
+  domain varchar [unique, null, note: 'null = nås via sökväg']
+  status site_status [default: 'coming_soon']
+  settings json [null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Ref: kommuner.lan_id > lan.id
+Ref: sites.kommun_id - kommuner.id
+
+// ============================================
+// ANVÄNDARE & ROLLER
+// ============================================
+
+Table users {
+  id bigint [pk, increment]
+  name varchar
+  email varchar [unique]
+  phone varchar [null]
+  password varchar
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Plattformsroller via spatie/laravel-permission (admin, redaktor, verksamhetsagare)'
+}
+
+Table roles {
+  id bigint [pk, increment]
+  name varchar [note: 'admin / redaktor / verksamhetsagare']
+  guard_name varchar
+}
+
+Table model_has_roles {
+  role_id bigint
+  model_type varchar
+  model_id bigint
+
+  indexes {
+    (role_id, model_id, model_type) [pk]
+  }
+}
+
+Ref: model_has_roles.role_id > roles.id
+
+// ============================================
+// KATEGORIER (nationella)
+// ============================================
+
+Table categories {
+  id bigint [pk, increment]
+  parent_id bigint [null]
+  type category_type
+  namn json [note: '{"sv": "...", "en": "..."}']
+  slug varchar
+  icon varchar [null]
+  sort_order smallint [default: 0]
+
+  indexes {
+    (slug, type) [unique]
+  }
+}
+
+Ref: categories.parent_id >? categories.id
+
+Table business_category {
+  business_id bigint
+  category_id bigint
+
+  indexes {
+    (business_id, category_id) [pk]
+  }
+
+  Note: 'Kategorier sätts på företaget, inte per lokalisering'
+}
+
+Table event_category {
+  event_id bigint
+  category_id bigint
+
+  indexes {
+    (event_id, category_id) [pk]
+  }
+}
+
+Ref: business_category.category_id > categories.id
+Ref: event_category.category_id > categories.id
+
+// ============================================
+// VERKSAMHETER (företag + lokaliseringar)
+// ============================================
+
+Table businesses {
+  id bigint [pk, increment]
+  kind varchar [default: 'company', note: 'v1-förberedelse för sport: company / association – föreningar delar katalog, locations, portal och godkännandeflöde med företag']
+  managed_by managed_by [default: 'editorial']
+  auto_approve boolean [default: false]
+  namn varchar
+  beskrivning json [note: 'Översättningsbar sv/en – gemensam för alla orter']
+  epost varchar [null]
+  webbplats varchar [null]
+  status content_status [default: 'draft']
+  published_at timestamp [null]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp [null]
+
+  Note: 'Företaget – vem man är. Användarkopplingen bor i business_user (flera personer kan hantera samma verksamhet).'
+}
+
+Table business_user {
+  business_id bigint
+  user_id bigint
+  role varchar [default: 'owner', note: 'owner / manager – styr t.ex. vem som får bjuda in fler']
+  created_at timestamp
+
+  indexes {
+    (business_id, user_id) [pk]
+  }
+
+  Note: 'v3: ersätter businesses.user_id. En restaurang kan ha ägare + anställd som båda uppdaterar lunchen.'
+}
+
+Ref: business_user.business_id > businesses.id
+Ref: business_user.user_id > users.id
+
+Table business_locations {
+  id bigint [pk, increment]
+  business_id bigint [not null]
+  kommun_id bigint [not null]
+  slug varchar [note: 'Sidan per ort: /verksamheter/{slug}']
+  namn varchar [null, note: 'Överskriver företagsnamnet vid behov, t.ex. "Acme Ludvika"']
+  telefon varchar [null]
+  adress varchar [null]
+  postnummer varchar [null]
+  ort varchar [null]
+  lat decimal(10,7) [null]
+  lng decimal(10,7) [null]
+  is_primary boolean [default: true]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp [null, note: 'v3: soft delete även här – en nedlagd filial ska inte hårdraderas']
+
+  indexes {
+    (business_id, kommun_id) [unique]
+    (slug, kommun_id) [unique, note: 'OBS soft delete: gör detta till partiellt index i Postgres – UNIQUE WHERE deleted_at IS NULL – annars blockerar raderade rader sluggen för alltid']
+    kommun_id [note: 'Driver listsidorna via join']
+  }
+
+  Note: 'De flesta företag har exakt en rad här. Öppettider och lunch hänger på lokaliseringen.'
+}
+
+Ref: business_locations.business_id > businesses.id
+Ref: business_locations.kommun_id > kommuner.id
+Ref: business_category.business_id > businesses.id
+
+Table opening_hours {
+  id bigint [pk, increment]
+  business_location_id bigint [not null]
+  weekday tinyint [note: '0 = måndag ... 6 = söndag']
+  opens time [null]
+  closes time [null]
+  closed boolean [default: false]
+
+  indexes {
+    (business_location_id, weekday) [unique]
+  }
+}
+
+Ref: opening_hours.business_location_id > business_locations.id
+
+Table lunch_menus {
+  id bigint [pk, increment]
+  business_location_id bigint [not null]
+  year smallint
+  week smallint
+  menu json [note: '{"mon": [...], "tue": [...]}']
+  status content_status [default: 'pending']
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (business_location_id, year, week) [unique]
+  }
+}
+
+Ref: lunch_menus.business_location_id > business_locations.id
+
+// ============================================
+// EVENEMANG
+// ============================================
+
+Table events {
+  id bigint [pk, increment]
+  kommun_id bigint [not null, note: 'Synkas automatiskt (model observer) från business_location när en sådan är satt – kan annars glida isär']
+  business_location_id bigint [null, note: 'Arrangör/plats om den finns i katalogen']
+  created_by bigint [not null]
+  namn varchar
+  slug varchar
+  beskrivning json
+  starts_at datetime
+  ends_at datetime [null]
+  venue_name varchar [null, note: 'Fritext om platsen inte finns i katalogen']
+  adress varchar [null]
+  lat decimal(10,7) [null]
+  lng decimal(10,7) [null]
+  pris varchar [null]
+  ticket_url varchar [null]
+  status content_status [default: 'draft']
+  published_at timestamp [null]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp [null]
+
+  indexes {
+    (slug, kommun_id) [unique, note: 'Partiellt index i Postgres (WHERE deleted_at IS NULL)']
+    (kommun_id, status, starts_at)
+  }
+}
+
+Ref: events.kommun_id > kommuner.id
+Ref: events.business_location_id >? business_locations.id
+Ref: events.created_by > users.id
+Ref: event_category.event_id > events.id
+
+// ============================================
+// REPORTAGE
+// ============================================
+
+Table articles {
+  id bigint [pk, increment]
+  kommun_id bigint [not null]
+  author_id bigint [not null]
+  titel json
+  slug varchar
+  ingress json
+  body json
+  featured boolean [default: false]
+  status content_status [default: 'draft']
+  published_at timestamp [null]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp [null]
+
+  indexes {
+    (slug, kommun_id) [unique, note: 'Partiellt index i Postgres (WHERE deleted_at IS NULL)']
+    (kommun_id, status)
+  }
+}
+
+Ref: articles.kommun_id > kommuner.id
+Ref: articles.author_id > users.id
+
+// ============================================
+// STATISKA SIDOR (v3)
+// ============================================
+
+Table pages {
+  id bigint [pk, increment]
+  kommun_id bigint [null, note: 'null = nationell sida (t.ex. integritetspolicy), satt = ortspecifik (t.ex. "Om Allt om Ludvika")']
+  slug varchar [note: '"om-oss", "kontakt", "integritetspolicy"']
+  titel json [note: 'Översättningsbar sv/en']
+  body json [note: 'Översättningsbar, HTML från rich text-editor']
+  status content_status [default: 'draft']
+  published_at timestamp [null]
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp [null]
+
+  indexes {
+    (slug, kommun_id) [unique, note: 'OBS: null räknas som distinkt i unika index (Postgres) – skydda nationella slugs med appvalidering eller UNIQUE-index på coalesce(kommun_id, 0)']
+  }
+
+  Note: 'v3: Om oss, Kontakt, Integritetspolicy m.fl. Redaktionen ändrar text utan kodrelease. Ortspecifik sida överskrider nationell vid samma slug.'
+}
+
+Ref: pages.kommun_id >? kommuner.id
+
+// ============================================
+// GODKÄNNANDEFLÖDE
+// ============================================
+
+Table revisions {
+  id bigint [pk, increment]
+  revisionable_type varchar [note: 'Polymorf: Business / BusinessLocation / Event / Article / LunchMenu / Offer / Page']
+  revisionable_id bigint
+  submitted_by bigint [not null]
+  payload json
+  status revision_status [default: 'pending']
+  reviewed_by bigint [null]
+  reviewed_at timestamp [null]
+  review_comment text [null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (revisionable_type, revisionable_id)
+    status
+  }
+
+  Note: 'Polymorf – ritas inte som FK. Publicerat innehåll rörs inte förrän revisionen godkänns. RADERA INTE godkända rader – de är gratis versionshistorik ("vad stod här i mars?").'
+}
+
+Ref: revisions.submitted_by > users.id
+Ref: revisions.reviewed_by >? users.id
+
+// ============================================
+// MEDIA (Spatie medialibrary, förenklad)
+// ============================================
+
+Table media {
+  id bigint [pk, increment]
+  model_type varchar [note: 'Polymorf: Business / Event / Article / Page – FK kan inte ritas, kopplingen bor i Eloquent (morphMany)']
+  model_id bigint
+  collection_name varchar [note: 'VIKTIGT: ägaruppladdningar → "pending"-collection, flyttas till publik collection först vid godkännande – annars smiter bilder förbi granskningen']
+  file_name varchar
+  mime_type varchar [null]
+  size bigint
+  custom_properties json
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (model_type, model_id)
+  }
+
+  Note: 'Ingen ON DELETE CASCADE (polymorf) – Spatie städar vid modellradering; egna polymorfa tabeller städas i deleting-event.'
+}
+
+// ============================================
+// NYHETSBREV
+// ============================================
+
+Table newsletter_subscribers {
+  id bigint [pk, increment]
+  kommun_id bigint [not null]
+  email varchar
+  token uuid
+  consented_at timestamp [note: 'GDPR-samtycke']
+  confirmed_at timestamp [null, note: 'Double opt-in']
+  unsubscribed_at timestamp [null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (email, kommun_id) [unique]
+  }
+}
+
+Ref: newsletter_subscribers.kommun_id > kommuner.id
+
+// ============================================
+// CROSS-MARKETING FAS 1: PROMOTIONS
+// ============================================
+
+Table promotions {
+  id bigint [pk, increment]
+  promotable_type varchar [note: 'Polymorf: BusinessLocation / Event / Article / Offer']
+  promotable_id bigint
+  kommun_id bigint [not null, note: 'Orten där innehållet visas (utöver hemkommunen)']
+  placement promotion_placement
+  starts_at datetime
+  ends_at datetime [null]
+  priority smallint [default: 0]
+  is_paid boolean [default: false, note: 'true → visas med "Annons"-etikett (marknadsföringslagen)']
+  price decimal(10,2) [null]
+  invoiced_at timestamp [null]
+  created_by bigint [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (kommun_id, placement, starts_at, ends_at) [note: 'Aktiva placeringar per yta']
+    (promotable_type, promotable_id)
+  }
+
+  Note: 'Startsidan = ordinarie innehåll för kommunen + aktiva promotions riktade hit. Länkar pekar alltid till innehållets hemsida (kanonisk URL).'
+}
+
+Ref: promotions.kommun_id > kommuner.id
+Ref: promotions.created_by > users.id
+
+// ============================================
+// CROSS-MARKETING FAS 2: OFFERS
+// ============================================
+
+Table offers {
+  id bigint [pk, increment]
+  business_id bigint [not null]
+  titel json [note: 'Översättningsbar sv/en']
+  beskrivning json
+  discount_type varchar [null, note: 'percentage / fixed / freebie']
+  discount_value decimal(10,2) [null]
+  code varchar [null]
+  starts_at datetime [null]
+  ends_at datetime [null]
+  status content_status [default: 'draft', note: 'Går genom revisions-kön som allt annat']
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp [null]
+
+  indexes {
+    (business_id, status)
+  }
+
+  Note: 'Synliggörs via promotions (t.ex. på partnerortens startsida)'
+}
+
+Ref: offers.business_id > businesses.id
+
+// ============================================
+// FRAMTID – FAS 3 (byggs vid bevisad efterfrågan)
+// Ska INTE migreras i v1.
+// ============================================
+
+Enum partnership_status {
+  proposed
+  active
+  paused
+  ended
+}
+
+Enum partnership_type {
+  referral
+  cross_promotion
+  bundle
+  sponsorship
+}
+
+Enum campaign_status {
+  draft
+  active
+  paused
+  completed
+}
+
+Table framtid_business_partnerships {
+  id bigint [pk, increment]
+  business_id bigint [not null]
+  partner_business_id bigint [not null]
+  type partnership_type
+  status partnership_status [default: 'proposed']
+  name varchar [null]
+  starts_at datetime [null]
+  ends_at datetime [null]
+  created_by bigint [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'FAS 3. Samarbete mellan två företag, t.ex. hotell ↔ restaurang.'
+}
+
+Ref: framtid_business_partnerships.business_id > businesses.id
+Ref: framtid_business_partnerships.partner_business_id > businesses.id
+
+Table framtid_campaigns {
+  id bigint [pk, increment]
+  lan_id bigint [null, note: 'Regional kampanj, t.ex. "Sommar i Dalarna"']
+  kommun_id bigint [null, note: 'Eller lokal – en av dessa sätts']
+  name varchar
+  slug varchar
+  starts_at datetime
+  ends_at datetime [null]
+  status campaign_status [default: 'draft']
+  created_by bigint [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'FAS 3. Tidsbegränsad kampanj med flera deltagande företag.'
+}
+
+Ref: framtid_campaigns.lan_id >? lan.id
+Ref: framtid_campaigns.kommun_id >? kommuner.id
+
+Table framtid_campaign_business {
+  campaign_id bigint
+  business_id bigint
+  role varchar [note: 'partner / sponsor / participant']
+
+  indexes {
+    (campaign_id, business_id) [pk]
+  }
+}
+
+Ref: framtid_campaign_business.campaign_id > framtid_campaigns.id
+Ref: framtid_campaign_business.business_id > businesses.id
+
+Table framtid_referrals {
+  id bigint [pk, increment]
+  campaign_id bigint [null]
+  partnership_id bigint [null]
+  offer_id bigint [null]
+  source_business_id bigint [not null]
+  target_business_id bigint [not null]
+  referral_code varchar [null]
+  converted boolean [default: false]
+  value decimal(10,2) [null]
+  occurred_at timestamp
+  created_at timestamp
+
+  Note: 'FAS 3. OBS: kräver att köp faktiskt rapporteras in (kassaintegration eller manuellt) – lös det innan tabellen byggs.'
+}
+
+Ref: framtid_referrals.source_business_id > businesses.id
+Ref: framtid_referrals.target_business_id > businesses.id
+Ref: framtid_referrals.offer_id >? offers.id
+Ref: framtid_referrals.partnership_id >? framtid_business_partnerships.id
+Ref: framtid_referrals.campaign_id >? framtid_campaigns.id
+
+// ============================================
+// FRAMTID – FAS 4: AUDIENCES (målgrupper)
+// ============================================
+
+Table framtid_audiences {
+  id bigint [pk, increment]
+  name varchar [note: 'Barnfamiljer / Turister / Seniorer ...']
+  slug varchar [unique]
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'FAS 4. Grund för framtida partnermatchning.'
+}
+
+Table framtid_business_audience {
+  business_id bigint
+  audience_id bigint
+
+  indexes {
+    (business_id, audience_id) [pk]
+  }
+}
+
+Ref: framtid_business_audience.business_id > businesses.id
+Ref: framtid_business_audience.audience_id > framtid_audiences.id
+
+// ============================================
+// FRAMTID – SPORT (förberedd, byggs som egen modul)
+// Nyckelidé: en match ÄR ett event (1:1-utökning).
+// Kalender, godkännandeflöde, promotions och sök
+// följer då med gratis. Föreningar bor i businesses
+// (kind = association), anläggningar i business_locations,
+// sporter i categories (type = sport).
+// ============================================
+
+Table framtid_teams {
+  id bigint [pk, increment]
+  business_id bigint [not null, note: 'Klubben/föreningen i businesses']
+  category_id bigint [not null, note: 'Sporten – categories med type = sport']
+  namn varchar [note: '"A-lag herr", "P12"']
+  slug varchar
+  created_at timestamp
+  updated_at timestamp
+  deleted_at timestamp [null]
+
+  indexes {
+    (business_id, slug) [unique]
+  }
+}
+
+Ref: framtid_teams.business_id > businesses.id
+Ref: framtid_teams.category_id > categories.id
+
+Table framtid_series {
+  id bigint [pk, increment]
+  namn varchar [note: '"Division 3 Västra Svealand"']
+  season varchar [note: '"2026/2027"']
+  category_id bigint [not null]
+  external_id varchar [null, note: 'ID hos extern datakälla (förbunds-/resultat-API) för synk av resultat och tabeller']
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Resultat (matches) och tabell (standings) kopplas hit; external_id driver API-synken.'
+}
+
+Ref: framtid_series.category_id > categories.id
+
+Table framtid_matches {
+  id bigint [pk, increment]
+  event_id bigint [null, unique, note: '1:1 när satt – matchen ÄR då ett event och syns i kalendern. null = ren resultatrad, t.ex. match mellan två bortalag i samma serie']
+  series_id bigint [null]
+  home_team_id bigint [null]
+  home_team_name varchar [null, note: 'Fritext om laget inte finns i systemet – samma mönster som events.venue_name']
+  away_team_id bigint [null]
+  away_team_name varchar [null]
+  home_score smallint [null, note: 'null tills matchen spelats']
+  away_score smallint [null]
+  match_status varchar [default: 'scheduled', note: 'scheduled / live / finished / postponed']
+  created_at timestamp
+  updated_at timestamp
+
+  Note: 'Match med event_id syns i kalendern; match utan är en resultatrad så hela omgången kan visas. Lag utan egen team-rad anges i fritext. Datainflödet är den svåra delen – föreningen rapporterar via portalen eller så synkas allt via series.external_id. Resultat och tabeller är faktauppgifter: auto-publicera dem, skicka dem inte genom godkännandekön. Behövs speltid för en resultatrad utan event: lägg played_at datetime.'
+}
+
+Ref: framtid_matches.event_id -? events.id
+Ref: framtid_matches.series_id >? framtid_series.id
+Ref: framtid_matches.home_team_id >? framtid_teams.id
+Ref: framtid_matches.away_team_id >? framtid_teams.id
+
+Table framtid_standings {
+  id bigint [pk, increment]
+  series_id bigint [not null]
+  team_id bigint [null, note: 'Länk till lokalt lag när det finns']
+  team_name varchar [note: 'Sätts alltid, även för lokala lag – visningsnamnet från källan']
+  position smallint [note: 'Från källan – tiebreak-regler skiljer per förbund, räkna inte om själva']
+  played smallint [default: 0]
+  wins smallint [default: 0]
+  draws smallint [default: 0]
+  losses smallint [default: 0]
+  score_for smallint [default: 0, note: 'Gjorda mål/poäng']
+  score_against smallint [default: 0]
+  points smallint [default: 0]
+  extra json [null, note: 'Sportspecifikt: OT-vinster, straffvinster, sätt ...']
+  synced_at timestamp [null, note: 'Senaste synk/manuella uppdatering']
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    (series_id, team_name) [unique]
+    (series_id, position)
+  }
+
+  Note: 'Hela serietabellen – en rad per lag, inte bara lokala. Speglar källan (API-synk via series.external_id eller manuell uppdatering). Beräkna själva endast om seriens samtliga matcher finns i systemet.'
+}
+
+Ref: framtid_standings.series_id > framtid_series.id
+Ref: framtid_standings.team_id >? framtid_teams.id
+
+// ---------- Grupper i diagrammet ----------
+
+TableGroup geografi {
+  lan
+  kommuner
+  sites
+}
+
+TableGroup verksamheter {
+  businesses
+  business_user
+  business_locations
+  opening_hours
+  lunch_menus
+}
+
+TableGroup innehall {
+  events
+  articles
+  pages
+  categories
+}
+
+TableGroup crossmarketing_v1 {
+  promotions
+  offers
+}
+
+TableGroup framtid_sport {
+  framtid_teams
+  framtid_series
+  framtid_matches
+  framtid_standings
+}
+
+TableGroup framtid_fas3_4 {
+  framtid_business_partnerships
+  framtid_campaigns
+  framtid_campaign_business
+  framtid_referrals
+  framtid_audiences
+  framtid_business_audience
+}

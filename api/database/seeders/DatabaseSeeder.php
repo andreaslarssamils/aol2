@@ -2,6 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Enums\SiteStatus;
+use App\Models\Kommun;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -15,11 +18,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            LanSeeder::class,
+            KommunSeeder::class,
+            RoleSeeder::class,
+            CategorySeeder::class,
         ]);
+
+        // Första sajten: Allt om Ludvika.
+        Site::firstOrCreate(
+            ['kommun_id' => Kommun::where('kod', '2085')->value('id')],
+            ['namn' => 'Allt om Ludvika', 'status' => SiteStatus::Active],
+        );
+
+        User::firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['name' => 'Test User', 'password' => 'password'],
+        )->syncRoles([User::ROLE_ADMIN]);
     }
 }
