@@ -89,6 +89,6 @@ class Event extends Model implements HasMedia
 
     public function categories(): BelongsToMany
     {
-        return $this->belongsToMany(Category::class);
+        return $this->belongsToMany(Category::class, 'event_category');
     }
 }
