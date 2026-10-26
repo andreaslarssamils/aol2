@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /** Prenumerant per ort. Double opt-in: confirmed_at sätts via token-länken. */
-#[Fillable(['kommun_id', 'email', 'consented_at', 'confirmed_at', 'unsubscribed_at'])]
+#[Fillable(['kommun_id', 'email', 'consented_at', 'consent_ip', 'consent_source', 'confirmed_at', 'unsubscribed_at'])]
 class NewsletterSubscriber extends Model
 {
     /** @use HasFactory<NewsletterSubscriberFactory> */

@@ -3,19 +3,20 @@
 use App\Enums\ContentStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        // URL:en bor i slugs-tabellen – en per språk, plus gamla Wagtail-sökvägar som icke-kanoniska rader.
         Schema::create('articles', function (Blueprint $table) {
             $table->id();
             $table->foreignId('kommun_id')->constrained('kommuner')->restrictOnDelete();
-            $table->foreignId('author_id')->constrained('users')->restrictOnDelete();
+            $table->foreignId('author_id')->nullable()->constrained('users')->nullOnDelete()
+                ->comment('Nullable för GDPR-radering – bylinen bevaras i author_name');
+            $table->string('author_name')->nullable();
             $table->jsonb('titel');
-            $table->string('slug');
             $table->jsonb('ingress');
             $table->jsonb('body');
             $table->boolean('featured')->default(false);
@@ -24,10 +25,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['kommun_id', 'status']);
+            $table->index(['kommun_id', 'status', 'published_at']);
         });
-
-        DB::statement('CREATE UNIQUE INDEX articles_slug_kommun_id_unique ON articles (slug, kommun_id) WHERE deleted_at IS NULL');
     }
 
     public function down(): void

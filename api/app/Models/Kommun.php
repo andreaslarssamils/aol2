@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Table('kommuner')]
 #[Fillable(['lan_id', 'namn', 'kod', 'slug', 'lat', 'lng'])]
@@ -35,9 +35,10 @@ class Kommun extends Model
         return $this->belongsTo(Lan::class);
     }
 
-    public function site(): HasOne
+    /** Vilka sajter visar den här kommunen? */
+    public function sites(): BelongsToMany
     {
-        return $this->hasOne(Site::class);
+        return $this->belongsToMany(Site::class, 'site_kommun')->withPivot('sort_order');
     }
 
     public function businessLocations(): HasMany

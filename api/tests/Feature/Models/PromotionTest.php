@@ -16,11 +16,12 @@ it('lists active promotions for a kommun and placement', function () {
     Promotion::factory()->create(['kommun_id' => $kommun, 'promotable_id' => $event, 'starts_at' => now()->addDay()]);
     Promotion::factory()->create(['kommun_id' => $kommun, 'promotable_id' => $event, 'ends_at' => now()->subDay()]);
     Promotion::factory()->create(['kommun_id' => $kommun, 'promotable_id' => $event, 'placement' => PromotionPlacement::Nyhetsbrev]);
+    Promotion::factory()->paused()->create(['kommun_id' => $kommun, 'promotable_id' => $event]);
 
     $result = Promotion::active(PromotionPlacement::Startsida)->where('kommun_id', $kommun->id)->get();
 
     expect($result)->toHaveCount(1)
         ->and($result->first()->is($active))->toBeTrue()
         ->and($result->first()->promotable->is($event))->toBeTrue()
-        ->and($event->promotions)->toHaveCount(4);
+        ->and($event->promotions)->toHaveCount(5);
 });

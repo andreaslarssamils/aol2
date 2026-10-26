@@ -26,10 +26,13 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Första sajten: Allt om Ludvika.
-        Site::firstOrCreate(
-            ['kommun_id' => Kommun::where('kod', '2085')->value('id')],
-            ['namn' => 'Allt om Ludvika', 'status' => SiteStatus::Active],
+        $ludvika = Kommun::where('kod', '2085')->firstOrFail();
+
+        $site = Site::firstOrCreate(
+            ['slug' => 'ludvika'],
+            ['namn' => 'Allt om Ludvika', 'primary_kommun_id' => $ludvika->id, 'status' => SiteStatus::Active],
         );
+        $site->kommuner()->syncWithoutDetaching([$ludvika->id => ['sort_order' => 0]]);
 
         User::firstOrCreate(
             ['email' => 'test@example.com'],

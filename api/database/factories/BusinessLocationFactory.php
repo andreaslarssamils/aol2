@@ -17,7 +17,6 @@ class BusinessLocationFactory extends Factory
         return [
             'business_id' => Business::factory(),
             'kommun_id' => Kommun::factory(),
-            'slug' => fake()->unique()->slug(3),
             'namn' => null,
             'telefon' => fake()->phoneNumber(),
             'adress' => fake()->streetAddress(),
@@ -27,5 +26,16 @@ class BusinessLocationFactory extends Factory
             'lng' => fake()->longitude(11.0, 24.0),
             'is_primary' => true,
         ];
+    }
+
+    /** Varje lokalisering får en svensk slug direkt. */
+    public function configure(): static
+    {
+        return $this->afterCreating(fn (BusinessLocation $location) => $location->setSlug('sv', fake()->unique()->slug(3)));
+    }
+
+    public function secondary(): static
+    {
+        return $this->state(fn () => ['is_primary' => false]);
     }
 }

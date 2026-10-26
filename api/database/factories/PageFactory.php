@@ -18,12 +18,16 @@ class PageFactory extends Factory
 
         return [
             'kommun_id' => null,
-            'slug' => Str::slug($titel),
             'titel' => ['sv' => Str::ucfirst($titel), 'en' => Str::ucfirst($titel)],
             'body' => ['sv' => '<p>'.fake()->paragraph().'</p>', 'en' => '<p>'.fake()->paragraph().'</p>'],
             'status' => ContentStatus::Draft,
             'published_at' => null,
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(fn (Page $page) => $page->setSlug('sv', Str::slug($page->titel['sv'])));
     }
 
     public function published(): static

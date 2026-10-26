@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ContentStatus;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasRevisions;
+use App\Models\Concerns\HasSlugs;
 use Database\Factories\PageFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -17,14 +18,14 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
- * Statiska sidor: Om oss, Kontakt, Integritetspolicy m.fl.
+ * Statiska sidor: Om oss, Kontakt, Integritetspolicy m.fl. URL:en bor i slugs-tabellen.
  * kommun_id null = nationell sida; en ortspecifik sida med samma slug överskrider den.
  */
-#[Fillable(['kommun_id', 'slug', 'titel', 'body', 'status', 'published_at'])]
+#[Fillable(['kommun_id', 'titel', 'body', 'status', 'published_at'])]
 class Page extends Model implements HasMedia
 {
     /** @use HasFactory<PageFactory> */
-    use HasContentStatus, HasFactory, HasRevisions, InteractsWithMedia, SoftDeletes;
+    use HasContentStatus, HasFactory, HasRevisions, HasSlugs, InteractsWithMedia, SoftDeletes;
 
     protected $attributes = [
         'status' => ContentStatus::Draft->value,
@@ -52,13 +53,18 @@ class Page extends Model implements HasMedia
         $query->whereNull('kommun_id');
     }
 
-    /** Ortens egen sida om den finns, annars den nationella. */
+    /** Ortens egen sida om den finns, annars den nationella – via kanonisk slug för locale. */
     #[Scope]
-    protected function forKommun(Builder $query, Kommun $kommun, string $slug): void
+    protected function forKommun(Builder $query, Kommun|int $kommun, string $slug, string $locale = 'sv'): void
     {
-        $query->where('slug', $slug)
-            ->where(fn (Builder $q) => $q->where('kommun_id', $kommun->id)->orWhereNull('kommun_id'))
-            ->orderByRaw('kommun_id IS NULL'); // ortspecifik först
+        $kommunId = $kommun instanceof Kommun ? $kommun->id : $kommun;
+
+        $query->whereHas('slugs', fn (Builder $slugs) => $slugs
+            ->where('locale', $locale)
+            ->where('slug', $slug)
+            ->where('is_canonical', true)
+            ->where(fn (Builder $q) => $q->where('kommun_id', $kommunId)->orWhereNull('kommun_id')))
+            ->orderByRaw('pages.kommun_id IS NULL'); // ortspecifik först
     }
 
     public function kommun(): BelongsTo

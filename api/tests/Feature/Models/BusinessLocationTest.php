@@ -3,36 +3,48 @@
 use App\Models\Business;
 use App\Models\BusinessLocation;
 use App\Models\Kommun;
+use App\Models\OpeningHour;
+use App\Models\OpeningHourException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
-it('rejects two active locations with the same slug in the same kommun', function () {
+it('allows several locations for one business in the same kommun', function () {
+    $business = Business::factory()->create();
     $kommun = Kommun::factory()->create();
-    BusinessLocation::factory()->create(['kommun_id' => $kommun, 'slug' => 'acme']);
 
-    expect(fn () => DB::transaction(fn () => BusinessLocation::factory()->create(['kommun_id' => $kommun, 'slug' => 'acme'])))
-        ->toThrow(UniqueConstraintViolationException::class);
+    BusinessLocation::factory()->for($business)->create(['kommun_id' => $kommun, 'namn' => 'Acme Centrum']);
+    BusinessLocation::factory()->for($business)->secondary()->create(['kommun_id' => $kommun, 'namn' => 'Acme Lyviksberget']);
+
+    expect($business->locations()->where('kommun_id', $kommun->id)->count())->toBe(2);
 });
 
-it('lets a soft-deleted location release its slug', function () {
-    $kommun = Kommun::factory()->create();
-    $old = BusinessLocation::factory()->create(['kommun_id' => $kommun, 'slug' => 'acme']);
+it('allows only one primary location per business', function () {
+    $business = Business::factory()->create();
+    BusinessLocation::factory()->for($business)->create(['is_primary' => true]);
+
+    expect(fn () => DB::transaction(fn () => BusinessLocation::factory()->for($business)->create(['is_primary' => true])))
+        ->toThrow(UniqueConstraintViolationException::class);
+
+    BusinessLocation::factory()->for($business)->secondary()->create();
+    BusinessLocation::factory()->create(['is_primary' => true]); // annat företag
+
+    expect($business->locations)->toHaveCount(2)
+        ->and($business->primaryLocation)->not->toBeNull();
+});
+
+it('frees the primary flag when the primary location is soft-deleted', function () {
+    $business = Business::factory()->create();
+    $old = BusinessLocation::factory()->for($business)->create(['is_primary' => true]);
     $old->delete();
 
-    $new = BusinessLocation::factory()->create(['kommun_id' => $kommun, 'slug' => 'acme']);
+    $new = BusinessLocation::factory()->for($business)->create(['is_primary' => true]);
 
-    expect($new->exists)->toBeTrue()
-        ->and(BusinessLocation::withTrashed()->where('slug', 'acme')->count())->toBe(2);
-});
-
-it('allows the same slug in different kommuner', function () {
-    BusinessLocation::factory()->create(['slug' => 'acme']);
-    BusinessLocation::factory()->create(['slug' => 'acme']);
-
-    expect(BusinessLocation::where('slug', 'acme')->count())->toBe(2);
+    expect($business->primaryLocation->is($new))->toBeTrue()
+        ->and(BusinessLocation::withTrashed()->where('business_id', $business->id)->count())->toBe(2);
 });
 
 it('falls back to the business name when the location has none', function () {
@@ -44,4 +56,29 @@ it('falls back to the business name when the location has none', function () {
     $location->namn = 'Acme Ludvika';
 
     expect($location->display_name)->toBe('Acme Ludvika');
+});
+
+it('allows two opening intervals on the same weekday, sorted by opens', function () {
+    $location = BusinessLocation::factory()->create();
+    OpeningHour::factory()->for($location)->create(['weekday' => 1, 'opens' => '17:00', 'closes' => '21:00']);
+    OpeningHour::factory()->for($location)->create(['weekday' => 1, 'opens' => '11:00', 'closes' => '14:00']);
+
+    expect($location->openingHours()->where('weekday', 1)->pluck('opens')->all())
+        ->toBe(['11:00:00', '17:00:00']);
+});
+
+it('lets an exception win over the regular hours for that date', function () {
+    $location = BusinessLocation::factory()->create();
+    $tuesday = Carbon::parse('next tuesday');
+    OpeningHour::factory()->for($location)->create(['weekday' => 1, 'opens' => '09:00', 'closes' => '17:00']);
+    OpeningHourException::factory()->for($location)->create(['date' => $tuesday, 'note' => 'Midsommarafton']);
+
+    $onTheDay = $location->hoursOn($tuesday);
+    $weekAfter = $location->hoursOn($tuesday->copy()->addWeek());
+
+    expect($onTheDay)->toHaveCount(1)
+        ->and($onTheDay->first())->toBeInstanceOf(OpeningHourException::class)
+        ->and($onTheDay->first()->closed)->toBeTrue()
+        ->and($weekAfter->first())->toBeInstanceOf(OpeningHour::class)
+        ->and($weekAfter->first()->opens)->toBe('09:00:00');
 });

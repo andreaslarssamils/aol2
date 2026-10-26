@@ -3,23 +3,38 @@
 use App\Models\BusinessLocation;
 use App\Models\Event;
 use App\Models\Kommun;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
-it('syncs kommun_id from the business location', function () {
+it('fills kommun_id from the business location when none is given', function () {
     $ludvika = Kommun::factory()->create(['namn' => 'Ludvika']);
-    $falun = Kommun::factory()->create(['namn' => 'Falun']);
     $location = BusinessLocation::factory()->create(['kommun_id' => $ludvika]);
 
     $event = Event::factory()->create([
-        'kommun_id' => $falun, // fel kommun – ska skrivas över
+        'kommun_id' => null,
         'business_location_id' => $location,
     ]);
 
     expect($event->fresh()->kommun_id)->toBe($ludvika->id);
+});
+
+it('never overwrites an explicitly set kommun_id', function () {
+    $ludvika = Kommun::factory()->create(['namn' => 'Ludvika']);
+    $smedjebacken = Kommun::factory()->create(['namn' => 'Smedjebacken']);
+    $arrangor = BusinessLocation::factory()->create(['kommun_id' => $ludvika]);
+
+    // Arrangör i Ludvika, eventet äger rum i Smedjebacken.
+    $event = Event::factory()->create([
+        'kommun_id' => $smedjebacken,
+        'business_location_id' => $arrangor,
+    ]);
+
+    expect($event->fresh()->kommun_id)->toBe($smedjebacken->id);
+
+    $event->update(['namn' => 'Nytt namn']);
+
+    expect($event->fresh()->kommun_id)->toBe($smedjebacken->id);
 });
 
 it('keeps the given kommun when there is no business location', function () {
@@ -30,14 +45,12 @@ it('keeps the given kommun when there is no business location', function () {
     expect($event->kommun_id)->toBe($kommun->id);
 });
 
-it('frees the slug after soft delete', function () {
-    $kommun = Kommun::factory()->create();
-    $first = Event::factory()->create(['kommun_id' => $kommun, 'slug' => 'midsommar']);
+it('links occurrences of a recurring event to their parent', function () {
+    $parent = Event::factory()->create(['recurrence_rule' => 'FREQ=WEEKLY;BYDAY=TU']);
+    $first = Event::factory()->create(['parent_event_id' => $parent, 'starts_at' => now()->addWeek()]);
+    $second = Event::factory()->create(['parent_event_id' => $parent, 'starts_at' => now()->addWeeks(2)]);
 
-    expect(fn () => DB::transaction(fn () => Event::factory()->create(['kommun_id' => $kommun, 'slug' => 'midsommar'])))
-        ->toThrow(UniqueConstraintViolationException::class);
-
-    $first->delete();
-
-    expect(Event::factory()->create(['kommun_id' => $kommun, 'slug' => 'midsommar'])->exists)->toBeTrue();
+    expect($parent->occurrences->pluck('id')->all())->toBe([$first->id, $second->id])
+        ->and($first->parent->is($parent))->toBeTrue()
+        ->and($first->recurrence_rule)->toBeNull();
 });

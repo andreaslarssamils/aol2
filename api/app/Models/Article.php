@@ -6,6 +6,7 @@ use App\Enums\ContentStatus;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
+use App\Models\Concerns\HasSlugs;
 use Database\Factories\ArticleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,15 +16,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
-/** Reportage – redaktionellt innehåll per ort. */
+/** Reportage. URL:en bor i slugs-tabellen. Bylinen i author_name överlever GDPR-radering av kontot. */
 #[Fillable([
-    'kommun_id', 'author_id', 'titel', 'slug', 'ingress', 'body',
+    'kommun_id', 'author_id', 'author_name', 'titel', 'ingress', 'body',
     'featured', 'status', 'published_at',
 ])]
 class Article extends Model implements HasMedia
 {
     /** @use HasFactory<ArticleFactory> */
-    use HasContentStatus, HasFactory, HasPromotions, HasRevisions, InteractsWithMedia, SoftDeletes;
+    use HasContentStatus, HasFactory, HasPromotions, HasRevisions, HasSlugs, InteractsWithMedia, SoftDeletes;
 
     protected $attributes = [
         'featured' => false,

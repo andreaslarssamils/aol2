@@ -27,6 +27,9 @@ return new class extends Migration
             $table->unsignedInteger('order_column')->nullable()->index();
 
             $table->nullableTimestamps();
+
+            // v4: driver städjobbet som rensar pending-media vars revision avslagits eller som legat orörd.
+            $table->index(['collection_name', 'created_at']);
         });
     }
 };

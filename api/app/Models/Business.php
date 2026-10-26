@@ -91,4 +91,9 @@ class Business extends Model implements HasMedia
     {
         return $this->hasMany(Offer::class);
     }
+
+    public function claims(): HasMany
+    {
+        return $this->hasMany(BusinessClaim::class);
+    }
 }

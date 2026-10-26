@@ -16,16 +16,17 @@ class EventFactory extends Factory
 {
     public function definition(): array
     {
-        $namn = fake()->unique()->sentence(3);
         $startsAt = fake()->dateTimeBetween('+1 day', '+2 months');
 
         return [
             'kommun_id' => Kommun::factory(),
             'business_location_id' => null,
+            'parent_event_id' => null,
+            'recurrence_rule' => null,
             'created_by' => User::factory(),
-            'namn' => $namn,
-            'slug' => Str::slug($namn),
+            'namn' => fake()->unique()->sentence(3),
             'beskrivning' => ['sv' => fake()->paragraph(), 'en' => fake()->paragraph()],
+            'all_day' => false,
             'starts_at' => $startsAt,
             'ends_at' => (clone $startsAt)->modify('+2 hours'),
             'venue_name' => fake()->company(),
@@ -39,11 +40,21 @@ class EventFactory extends Factory
         ];
     }
 
+    public function configure(): static
+    {
+        return $this->afterCreating(fn (Event $event) => $event->setSlug('sv', Str::slug($event->namn)));
+    }
+
     public function published(): static
     {
         return $this->state(fn () => [
             'status' => ContentStatus::Published,
             'published_at' => now(),
         ]);
+    }
+
+    public function allDay(): static
+    {
+        return $this->state(fn () => ['all_day' => true]);
     }
 }

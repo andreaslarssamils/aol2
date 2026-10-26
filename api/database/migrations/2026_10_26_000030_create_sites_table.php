@@ -9,16 +9,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Vilka kommuner sajten visar bor i site_kommun. Innehåll hör fortfarande hemma i EN kommun.
         Schema::create('sites', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('kommun_id')->constrained('kommuner')->restrictOnDelete();
-            $table->string('namn');
+            $table->string('namn')->comment('"Allt om Ludvika", "Allt om Västerbergslagen"');
+            $table->string('slug')->unique();
             $table->string('domain')->nullable()->unique()->comment('null = nås via sökväg');
+            $table->foreignId('primary_kommun_id')->nullable()->constrained('kommuner')->nullOnDelete()
+                ->comment('Ort för väder, startsidans fokus och kanonisk URL när sajten täcker flera');
             $table->string('status')->default(SiteStatus::ComingSoon->value);
             $table->jsonb('settings')->nullable();
             $table->timestamps();
-
-            $table->unique('kommun_id'); // En sajt per kommun
         });
     }
 

@@ -8,15 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Flera intervall per dag är tillåtet (11–14 och 17–21). Sortera på opens vid visning.
         Schema::create('opening_hours', function (Blueprint $table) {
             $table->id();
             $table->foreignId('business_location_id')->constrained()->cascadeOnDelete();
-            $table->unsignedTinyInteger('weekday')->comment('0 = måndag ... 6 = söndag');
+            $table->smallInteger('weekday')->comment('0 = måndag ... 6 = söndag');
             $table->time('opens')->nullable();
             $table->time('closes')->nullable();
             $table->boolean('closed')->default(false);
 
-            $table->unique(['business_location_id', 'weekday']);
+            $table->index(['business_location_id', 'weekday']);
         });
     }
 

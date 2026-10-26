@@ -13,12 +13,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * Godkännandeflödet. Publicerat innehåll rörs inte förrän revisionen
- * godkänns. Godkända rader raderas aldrig – de är versionshistorik.
+ * Inkorg, inte tillstånd. Raden i innehållstabellen rörs först vid godkännande, då payload
+ * skrivs dit, status sätts och applied_at stämplas. Avslag rör aldrig raden.
+ * Godkända rader raderas aldrig – de är versionshistorik.
  */
 #[Fillable([
     'revisionable_type', 'revisionable_id', 'submitted_by', 'payload',
-    'status', 'reviewed_by', 'reviewed_at', 'review_comment',
+    'status', 'reviewed_by', 'reviewed_at', 'review_comment', 'applied_at',
 ])]
 class Revision extends Model
 {
@@ -35,6 +36,7 @@ class Revision extends Model
             'payload' => 'array',
             'status' => RevisionStatus::class,
             'reviewed_at' => 'datetime',
+            'applied_at' => 'datetime',
         ];
     }
 

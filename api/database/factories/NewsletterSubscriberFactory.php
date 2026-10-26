@@ -17,6 +17,8 @@ class NewsletterSubscriberFactory extends Factory
             'kommun_id' => Kommun::factory(),
             'email' => fake()->unique()->safeEmail(),
             'consented_at' => now(),
+            'consent_ip' => fake()->ipv4(),
+            'consent_source' => 'startsida',
             'confirmed_at' => null,
             'unsubscribed_at' => null,
         ];

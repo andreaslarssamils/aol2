@@ -6,6 +6,7 @@ use App\Enums\ContentStatus;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
+use App\Models\Concerns\HasSlugs;
 use App\Observers\EventObserver;
 use Database\Factories\EventFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,22 +15,28 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
+/**
+ * Evenemang. URL:en bor i slugs-tabellen. Återkommande event: recurrence_rule (RRULE) på
+ * moderposten, förekomsterna materialiseras som barnrader med parent_event_id.
+ */
 #[Fillable([
-    'kommun_id', 'business_location_id', 'created_by', 'namn', 'slug', 'beskrivning',
-    'starts_at', 'ends_at', 'venue_name', 'adress', 'lat', 'lng', 'pris', 'ticket_url',
-    'status', 'published_at',
+    'kommun_id', 'business_location_id', 'parent_event_id', 'recurrence_rule', 'created_by',
+    'namn', 'beskrivning', 'all_day', 'starts_at', 'ends_at', 'venue_name', 'adress',
+    'lat', 'lng', 'pris', 'ticket_url', 'status', 'published_at',
 ])]
 #[ObservedBy([EventObserver::class])]
 class Event extends Model implements HasMedia
 {
     /** @use HasFactory<EventFactory> */
-    use HasContentStatus, HasFactory, HasPromotions, HasRevisions, InteractsWithMedia, SoftDeletes;
+    use HasContentStatus, HasFactory, HasPromotions, HasRevisions, HasSlugs, InteractsWithMedia, SoftDeletes;
 
     protected $attributes = [
+        'all_day' => false,
         'status' => ContentStatus::Draft->value,
     ];
 
@@ -37,6 +44,7 @@ class Event extends Model implements HasMedia
     {
         return [
             'beskrivning' => 'array',
+            'all_day' => 'boolean',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'lat' => 'decimal:7',
@@ -61,6 +69,17 @@ class Event extends Model implements HasMedia
     public function businessLocation(): BelongsTo
     {
         return $this->belongsTo(BusinessLocation::class);
+    }
+
+    /** Moderposten för en förekomst av ett återkommande event. */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Event::class, 'parent_event_id');
+    }
+
+    public function occurrences(): HasMany
+    {
+        return $this->hasMany(Event::class, 'parent_event_id')->orderBy('starts_at');
     }
 
     public function creator(): BelongsTo

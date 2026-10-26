@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\PromotionPlacement;
+use App\Enums\PromotionStatus;
 use App\Models\Event;
 use App\Models\Kommun;
 use App\Models\Promotion;
@@ -21,6 +22,7 @@ class PromotionFactory extends Factory
             'promotable_id' => Event::factory(),
             'kommun_id' => Kommun::factory(),
             'placement' => PromotionPlacement::Startsida,
+            'status' => PromotionStatus::Active,
             'starts_at' => now()->subDay(),
             'ends_at' => now()->addWeek(),
             'priority' => 0,
@@ -34,5 +36,10 @@ class PromotionFactory extends Factory
     public function paid(float $price = 500): static
     {
         return $this->state(fn () => ['is_paid' => true, 'price' => $price]);
+    }
+
+    public function paused(): static
+    {
+        return $this->state(fn () => ['status' => PromotionStatus::Paused]);
     }
 }

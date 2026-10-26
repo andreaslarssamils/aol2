@@ -16,7 +16,7 @@ class LunchMenuFactory extends Factory
     {
         return [
             'business_location_id' => BusinessLocation::factory(),
-            'year' => (int) now()->format('o'),
+            'iso_year' => (int) now()->format('o'),
             'week' => (int) now()->format('W'),
             'menu' => [
                 'mon' => [fake()->sentence(3)],
@@ -25,7 +25,8 @@ class LunchMenuFactory extends Factory
                 'thu' => [fake()->sentence(3)],
                 'fri' => [fake()->sentence(3)],
             ],
-            'status' => ContentStatus::Pending,
+            'status' => ContentStatus::Draft,
+            'published_at' => null,
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PromotionPlacement;
+use App\Enums\PromotionStatus;
 use Database\Factories\PromotionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -14,10 +15,10 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * Cross-marketing: innehåll som visas på en annan orts yta under en period.
- * Länkar pekar alltid till innehållets hemsida (kanonisk URL).
+ * Länkar pekar alltid till innehållets kanoniska URL.
  */
 #[Fillable([
-    'promotable_type', 'promotable_id', 'kommun_id', 'placement', 'starts_at', 'ends_at',
+    'promotable_type', 'promotable_id', 'kommun_id', 'placement', 'status', 'starts_at', 'ends_at',
     'priority', 'is_paid', 'price', 'invoiced_at', 'created_by',
 ])]
 class Promotion extends Model
@@ -26,6 +27,7 @@ class Promotion extends Model
     use HasFactory;
 
     protected $attributes = [
+        'status' => PromotionStatus::Draft->value,
         'priority' => 0,
         'is_paid' => false,
     ];
@@ -34,6 +36,7 @@ class Promotion extends Model
     {
         return [
             'placement' => PromotionPlacement::class,
+            'status' => PromotionStatus::class,
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'priority' => 'integer',
@@ -43,11 +46,12 @@ class Promotion extends Model
         ];
     }
 
-    /** Aktiva placeringar just nu, för en given yta om angiven. */
+    /** Aktiva placeringar just nu: status active och inom datumfönstret. */
     #[Scope]
     protected function active(Builder $query, ?PromotionPlacement $placement = null): void
     {
-        $query->where('starts_at', '<=', now())
+        $query->where('status', PromotionStatus::Active)
+            ->where('starts_at', '<=', now())
             ->where(fn (Builder $q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
             ->when($placement, fn (Builder $q) => $q->where('placement', $placement))
             ->orderByDesc('priority');

@@ -21,14 +21,19 @@ class ArticleFactory extends Factory
         return [
             'kommun_id' => Kommun::factory(),
             'author_id' => User::factory(),
+            'author_name' => fake()->name(),
             'titel' => ['sv' => $titel, 'en' => $titel],
-            'slug' => Str::slug($titel),
             'ingress' => ['sv' => fake()->paragraph(), 'en' => fake()->paragraph()],
             'body' => ['sv' => '<p>'.fake()->paragraphs(3, true).'</p>', 'en' => '<p>'.fake()->paragraphs(3, true).'</p>'],
             'featured' => false,
             'status' => ContentStatus::Draft,
             'published_at' => null,
         ];
+    }
+
+    public function configure(): static
+    {
+        return $this->afterCreating(fn (Article $article) => $article->setSlug('sv', Str::slug($article->titel['sv'])));
     }
 
     public function published(): static

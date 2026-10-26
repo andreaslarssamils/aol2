@@ -7,19 +7,18 @@ use App\Models\Event;
 
 class EventObserver
 {
-    /** Evenemangets kommun följer alltid lokaliseringen när en sådan är satt. */
+    /**
+     * Fyll i kommun från lokaliseringen när ingen kommun är satt.
+     * Skriver aldrig över en befintlig kommun.
+     */
     public function saving(Event $event): void
     {
-        if ($event->business_location_id === null) {
+        if ($event->kommun_id !== null || $event->business_location_id === null) {
             return;
         }
 
-        $kommunId = BusinessLocation::withTrashed()
+        $event->kommun_id = BusinessLocation::withTrashed()
             ->whereKey($event->business_location_id)
             ->value('kommun_id');
-
-        if ($kommunId !== null) {
-            $event->kommun_id = $kommunId;
-        }
     }
 }

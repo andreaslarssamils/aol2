@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -20,7 +21,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, HasRoles, Notifiable, SoftDeletes;
 
     /** Plattformsroller (spatie/laravel-permission). */
     public const string ROLE_ADMIN = 'admin';
@@ -61,5 +62,10 @@ class User extends Authenticatable implements FilamentUser
     public function events(): HasMany
     {
         return $this->hasMany(Event::class, 'created_by');
+    }
+
+    public function claims(): HasMany
+    {
+        return $this->hasMany(BusinessClaim::class);
     }
 }

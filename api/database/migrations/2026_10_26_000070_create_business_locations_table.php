@@ -9,12 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // URL:en bor i slugs-tabellen. Flera rader per företag och ort är tillåtet.
         Schema::create('business_locations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('business_id')->constrained()->cascadeOnDelete();
             $table->foreignId('kommun_id')->constrained('kommuner')->restrictOnDelete();
-            $table->string('slug')->comment('Sidan per ort: /verksamheter/{slug}');
-            $table->string('namn')->nullable()->comment('Överskriver företagsnamnet vid behov');
+            $table->string('namn')->nullable()->comment('Överskriver företagsnamnet vid behov, "Acme Centrum"');
             $table->string('telefon')->nullable();
             $table->string('adress')->nullable();
             $table->string('postnummer')->nullable();
@@ -25,12 +25,12 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
+            $table->index(['business_id', 'kommun_id']);
             $table->index('kommun_id'); // Driver listsidorna via join
         });
 
-        // Partiella unika index: en soft-raderad rad ska inte blockera slug/ort för alltid.
-        DB::statement('CREATE UNIQUE INDEX business_locations_slug_kommun_id_unique ON business_locations (slug, kommun_id) WHERE deleted_at IS NULL');
-        DB::statement('CREATE UNIQUE INDEX business_locations_business_id_kommun_id_unique ON business_locations (business_id, kommun_id) WHERE deleted_at IS NULL');
+        // Bara en primär lokalisering per företag bland de som inte är raderade.
+        DB::statement('CREATE UNIQUE INDEX business_locations_primary_unique ON business_locations (business_id) WHERE is_primary AND deleted_at IS NULL');
     }
 
     public function down(): void

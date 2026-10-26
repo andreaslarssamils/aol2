@@ -10,25 +10,27 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /** Veckans lunch per lokalisering. menu: {"mon": [...], "tue": [...]}. */
-#[Fillable(['business_location_id', 'year', 'week', 'menu', 'status'])]
+#[Fillable(['business_location_id', 'iso_year', 'week', 'menu', 'status', 'published_at'])]
 class LunchMenu extends Model
 {
     /** @use HasFactory<LunchMenuFactory> */
-    use HasContentStatus, HasFactory, HasRevisions;
+    use HasContentStatus, HasFactory, HasRevisions, SoftDeletes;
 
     protected $attributes = [
-        'status' => ContentStatus::Pending->value,
+        'status' => ContentStatus::Draft->value,
     ];
 
     protected function casts(): array
     {
         return [
-            'year' => 'integer',
+            'iso_year' => 'integer',
             'week' => 'integer',
             'menu' => 'array',
             'status' => ContentStatus::class,
+            'published_at' => 'datetime',
         ];
     }
 

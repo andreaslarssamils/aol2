@@ -24,6 +24,7 @@ class RevisionFactory extends Factory
             'reviewed_by' => null,
             'reviewed_at' => null,
             'review_comment' => null,
+            'applied_at' => null,
         ];
     }
 
