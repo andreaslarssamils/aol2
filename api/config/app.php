@@ -80,6 +80,21 @@ return [
 
     'locale' => env('APP_LOCALE', 'en'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Content Locales
+    |--------------------------------------------------------------------------
+    |
+    | Språken som översättningsbart innehåll (titel, body, beskrivning ...) och
+    | slugs hanteras i. Första språket är redaktionens standardspråk.
+    |
+    */
+
+    'locales' => [
+        'sv' => 'Svenska',
+        'en' => 'English',
+    ],
+
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),

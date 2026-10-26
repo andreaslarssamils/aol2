@@ -2,10 +2,11 @@
 
 namespace App\Enums;
 
+use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
 
 /** Pausa en placering utan att skriva om datumen. */
-enum PromotionStatus: string implements HasLabel
+enum PromotionStatus: string implements HasColor, HasLabel
 {
     case Draft = 'draft';
     case Active = 'active';
@@ -19,6 +20,16 @@ enum PromotionStatus: string implements HasLabel
             self::Active => 'Aktiv',
             self::Paused => 'Pausad',
             self::Ended => 'Avslutad',
+        };
+    }
+
+    public function getColor(): string
+    {
+        return match ($this) {
+            self::Draft => 'gray',
+            self::Active => 'success',
+            self::Paused => 'warning',
+            self::Ended => 'gray',
         };
     }
 }

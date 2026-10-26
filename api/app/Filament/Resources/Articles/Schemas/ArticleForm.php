@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Filament\Resources\Articles\Schemas;
+
+use App\Filament\Forms\Components\ContentStatusSelect;
+use App\Filament\Forms\Components\ImagesUpload;
+use App\Filament\Forms\Components\KommunSelect;
+use App\Filament\Forms\Components\SlugInput;
+use App\Filament\Infolists\Components\SlugHistoryEntry;
+use App\Filament\Schemas\Components\LocaleTabs;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+
+class ArticleForm
+{
+    public static function configure(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make('Artikel')
+                    ->schema([
+                        KommunSelect::make()
+                            ->required(),
+                        Select::make('author_id')
+                            ->label('Författare')
+                            ->relationship('author', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->default(fn (): ?int => auth()->id()),
+                        TextInput::make('author_name')
+                            ->label('Byline')
+                            ->maxLength(255)
+                            ->default(fn (): ?string => auth()->user()?->name)
+                            ->helperText('Bevaras i arkivet även om kontot raderas.'),
+                        Toggle::make('featured')
+                            ->label('Utvald')
+                            ->inline(false),
+                    ])
+                    ->columns(2),
+                LocaleTabs::make()
+                    ->localeSchema(fn (string $locale, bool $isDefault): array => [
+                        TextInput::make("titel.{$locale}")
+                            ->label('Titel')
+                            ->required($isDefault)
+                            ->maxLength(255),
+                        SlugInput::forLocale($locale)
+                            ->fallbackTo("titel.{$locale}"),
+                        SlugHistoryEntry::forLocale($locale),
+                        Textarea::make("ingress.{$locale}")
+                            ->label('Ingress')
+                            ->rows(3),
+                        RichEditor::make("body.{$locale}")
+                            ->label('Brödtext'),
+                    ]),
+                Section::make('Publicering')
+                    ->schema([
+                        ContentStatusSelect::make(),
+                        DateTimePicker::make('published_at')
+                            ->label('Publicerad')
+                            ->seconds(false),
+                    ])
+                    ->columns(2),
+                Section::make('Bilder')
+                    ->schema([
+                        ImagesUpload::make(),
+                    ]),
+            ]);
+    }
+}

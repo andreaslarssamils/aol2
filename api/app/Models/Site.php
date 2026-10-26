@@ -60,4 +60,14 @@ class Site extends Model
     {
         return $this->kommuner()->pluck('kommuner.id')->all();
     }
+
+    /** Primärkommunen ska alltid visas på sajten. Idempotent. */
+    public function attachPrimaryKommun(): void
+    {
+        if ($this->primary_kommun_id === null) {
+            return;
+        }
+
+        $this->kommuner()->syncWithoutDetaching([$this->primary_kommun_id => ['sort_order' => 0]]);
+    }
 }
