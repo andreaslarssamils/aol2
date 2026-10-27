@@ -19,6 +19,7 @@ abstract class ContentRequest extends FormRequest
     /**
      * Regler för ett översättningsbart json-fält, {"sv": ..., "en": ...}. Krävs fältet
      * måste standardspråket vara ifyllt; övriga språk är valfria. Okända språk avvisas.
+     * Kolumnerna är NOT NULL, så fältet får utelämnas men aldrig vara null.
      *
      * @return array<string, array<int, string>>
      */
@@ -27,7 +28,7 @@ abstract class ContentRequest extends FormRequest
         $locales = static::locales();
         $defaultLocale = $locales[0];
 
-        $rules = [$field => [$required ? 'required' : 'nullable', 'array:'.implode(',', $locales)]];
+        $rules = [$field => [$required ? 'required' : 'sometimes', 'array:'.implode(',', $locales)]];
 
         foreach ($locales as $locale) {
             $rules["{$field}.{$locale}"] = array_values(array_filter([

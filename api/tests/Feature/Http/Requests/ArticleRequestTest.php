@@ -5,6 +5,7 @@ use App\Models\Article;
 use App\Models\Kommun;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 
 uses(RefreshDatabase::class);
 
@@ -23,5 +24,5 @@ it('accepts every proposable field of an article', function () {
     $revision = app(SubmitRevision::class)->handle($article, $payload, User::factory()->verksamhetsagare()->create());
 
     expect(array_keys($payload))->toEqualCanonicalizing(revisionPayloadFields($article))
-        ->and($revision->payload)->toEqual($payload);
+        ->and($revision->payload)->toEqual(Arr::except($payload, SubmitRevision::OWNERSHIP_FIELDS)); // ägarlänkar strippas för ägare
 });

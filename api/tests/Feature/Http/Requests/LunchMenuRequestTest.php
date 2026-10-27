@@ -5,6 +5,7 @@ use App\Models\BusinessLocation;
 use App\Models\LunchMenu;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 
 uses(RefreshDatabase::class);
 
@@ -20,5 +21,5 @@ it('accepts every proposable field of a lunch menu', function () {
     $revision = app(SubmitRevision::class)->handle($lunchMenu, $payload, User::factory()->verksamhetsagare()->create());
 
     expect(array_keys($payload))->toEqualCanonicalizing(revisionPayloadFields($lunchMenu))
-        ->and($revision->payload)->toEqual($payload);
+        ->and($revision->payload)->toEqual(Arr::except($payload, SubmitRevision::OWNERSHIP_FIELDS)); // ägarlänkar strippas för ägare
 });

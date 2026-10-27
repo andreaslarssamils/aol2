@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Kommun;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 
 uses(RefreshDatabase::class);
 
@@ -33,5 +34,5 @@ it('accepts every proposable field of an event', function () {
     $revision = app(SubmitRevision::class)->handle($event, $payload, User::factory()->verksamhetsagare()->create());
 
     expect(array_keys($payload))->toEqualCanonicalizing(revisionPayloadFields($event))
-        ->and($revision->payload)->toEqual($payload);
+        ->and($revision->payload)->toEqual(Arr::except($payload, SubmitRevision::OWNERSHIP_FIELDS)); // ägarlänkar strippas för ägare
 });

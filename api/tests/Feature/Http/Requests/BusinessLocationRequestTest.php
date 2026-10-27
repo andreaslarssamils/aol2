@@ -6,6 +6,7 @@ use App\Models\BusinessLocation;
 use App\Models\Kommun;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 
 uses(RefreshDatabase::class);
 
@@ -27,5 +28,5 @@ it('accepts every proposable field of a business location', function () {
     $revision = app(SubmitRevision::class)->handle($location, $payload, User::factory()->verksamhetsagare()->create());
 
     expect(array_keys($payload))->toEqualCanonicalizing(revisionPayloadFields($location))
-        ->and($revision->payload)->toEqual($payload);
+        ->and($revision->payload)->toEqual(Arr::except($payload, SubmitRevision::OWNERSHIP_FIELDS)); // ägarlänkar strippas för ägare
 });

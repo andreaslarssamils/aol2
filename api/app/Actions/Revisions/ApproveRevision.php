@@ -65,7 +65,8 @@ class ApproveRevision
         if (in_array(HasContentStatus::class, class_uses_recursive($model), true)) {
             $model->status = ContentStatus::Published;
 
-            if ($model->published_at === null) {
+            // Erbjudanden har status men inget publiceringsdatum.
+            if ($model->hasCast('published_at') && $model->published_at === null) {
                 $model->published_at = now();
             }
         }

@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\Offer;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 
 uses(RefreshDatabase::class);
 
@@ -25,5 +26,5 @@ it('accepts every proposable field of an offer', function () {
     $revision = app(SubmitRevision::class)->handle($offer, $payload, User::factory()->verksamhetsagare()->create());
 
     expect(array_keys($payload))->toEqualCanonicalizing(revisionPayloadFields($offer))
-        ->and($revision->payload)->toEqual($payload);
+        ->and($revision->payload)->toEqual(Arr::except($payload, SubmitRevision::OWNERSHIP_FIELDS)); // ägarlänkar strippas för ägare
 });

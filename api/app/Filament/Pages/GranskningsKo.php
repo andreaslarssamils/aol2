@@ -14,7 +14,6 @@ use App\Models\LunchMenu;
 use App\Models\Offer;
 use App\Models\Page as ContentPage;
 use App\Models\Revision;
-use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
@@ -53,7 +52,7 @@ class GranskningsKo extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasAnyRole([User::ROLE_ADMIN, User::ROLE_REDAKTOR]) ?? false;
+        return auth()->user()?->isEditorial() ?? false;
     }
 
     public static function getNavigationBadge(): ?string

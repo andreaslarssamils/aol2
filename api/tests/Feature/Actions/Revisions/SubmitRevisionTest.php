@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Revisions\ApproveRevision;
 use App\Actions\Revisions\SubmitRevision;
 use App\Enums\ContentStatus;
 use App\Enums\RevisionStatus;
@@ -8,7 +9,11 @@ use App\Models\Business;
 use App\Models\BusinessLocation;
 use App\Models\Category;
 use App\Models\Event;
+use App\Models\Kommun;
+use App\Models\LunchMenu;
+use App\Models\Offer;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 
@@ -142,3 +147,106 @@ it('drops fields outside the form request, such as status and auto_approve', fun
     expect($revision->payload)->toBe(['namn' => 'Nytt namn'])
         ->and($business->fresh()->auto_approve)->toBeFalse();
 });
+
+it('strips ownership links from a revision on an existing row, so an owner cannot move a location to another business', function (bool $belongsToBusiness) {
+    $owner = User::factory()->verksamhetsagare()->create();
+    $location = BusinessLocation::factory()->create(['adress' => 'Gamla gatan 1']);
+    $originalBusinessId = $location->business_id;
+    $otherBusiness = Business::factory()->create();
+
+    if ($belongsToBusiness) {
+        $location->business->addUser($owner);
+    }
+
+    $revision = app(SubmitRevision::class)->handle($location, [
+        'business_id' => $otherBusiness->id,
+        'kommun_id' => $location->kommun_id,
+        'adress' => 'Nya gatan 2',
+    ], $owner);
+
+    expect($revision->payload)->toEqual(['kommun_id' => $location->kommun_id, 'adress' => 'Nya gatan 2']);
+
+    app(ApproveRevision::class)->handle($revision, User::factory()->redaktor()->create());
+
+    expect($location->fresh()->business_id)->toBe($originalBusinessId)
+        ->and($location->fresh()->adress)->toBe('Nya gatan 2');
+})->with([
+    'owner of the business' => true,
+    'user without any link to the business' => false,
+]);
+
+it('forbids owners to create content under a business they do not belong to', function () {
+    $owner = User::factory()->verksamhetsagare()->create();
+    Business::factory()->create()->addUser($owner);
+    $otherBusiness = Business::factory()->create();
+
+    expect(fn () => app(SubmitRevision::class)->handle(new BusinessLocation, [
+        'business_id' => $otherBusiness->id,
+        'kommun_id' => Kommun::factory()->create()->id,
+        'adress' => 'Storgatan 1',
+    ], $owner))->toThrow(AuthorizationException::class);
+
+    $this->assertDatabaseCount('revisions', 0);
+    $this->assertDatabaseCount('business_locations', 0);
+});
+
+it('forbids owners to create content under a location of a business they do not belong to', function () {
+    $owner = User::factory()->verksamhetsagare()->create();
+    Business::factory()->create()->addUser($owner);
+    $othersLocation = BusinessLocation::factory()->create();
+
+    expect(fn () => app(SubmitRevision::class)->handle(new LunchMenu, [
+        'business_location_id' => $othersLocation->id,
+        'iso_year' => 2026,
+        'week' => 44,
+        'menu' => ['mon' => ['Köttbullar']],
+    ], $owner))->toThrow(AuthorizationException::class);
+
+    $this->assertDatabaseCount('revisions', 0);
+    $this->assertDatabaseCount('lunch_menus', 0);
+});
+
+it('creates new content under the owner\'s own business as a draft that the approval publishes', function () {
+    $owner = User::factory()->verksamhetsagare()->create();
+    $business = Business::factory()->create();
+    $business->addUser($owner);
+
+    $revision = app(SubmitRevision::class)->handle(new Offer, [
+        'business_id' => $business->id,
+        'titel' => ['sv' => 'Sommarrabatt', 'en' => 'Summer discount'],
+        'beskrivning' => ['sv' => '10 % på allt.', 'en' => '10% off everything.'],
+    ], $owner);
+
+    $offer = $revision->revisionable;
+
+    expect($revision->status)->toBe(RevisionStatus::Pending)
+        ->and($offer)->toBeInstanceOf(Offer::class)
+        ->and($offer->business_id)->toBe($business->id)
+        ->and($offer->titel['sv'])->toBe('Sommarrabatt')
+        ->and($offer->status)->toBe(ContentStatus::Draft);
+
+    app(ApproveRevision::class)->handle($revision, User::factory()->redaktor()->create());
+
+    expect($offer->fresh()->status)->toBe(ContentStatus::Published);
+});
+
+it('lets the editorial team move content between businesses and create it under any business', function (User $editor) {
+    $location = BusinessLocation::factory()->create();
+    $otherBusiness = Business::factory()->create();
+
+    $moved = app(SubmitRevision::class)->handle($location, [
+        'business_id' => $otherBusiness->id,
+        'kommun_id' => $location->kommun_id,
+    ], $editor);
+    $created = app(SubmitRevision::class)->handle(new BusinessLocation, [
+        'business_id' => $otherBusiness->id,
+        'kommun_id' => Kommun::factory()->create()->id,
+        'adress' => 'Storgatan 1',
+    ], $editor);
+
+    expect($moved->payload['business_id'])->toBe($otherBusiness->id)
+        ->and($created->revisionable->business_id)->toBe($otherBusiness->id);
+})->with([
+    'admin' => fn () => User::factory()->admin()->create(),
+    'redaktör' => fn () => User::factory()->redaktor()->create(),
+]);

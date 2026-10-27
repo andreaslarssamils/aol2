@@ -43,10 +43,16 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
+    /** Redaktionen (admin och redaktör) publicerar direkt och får flytta innehåll mellan verksamheter. */
+    public function isEditorial(): bool
+    {
+        return $this->hasAnyRole([self::ROLE_ADMIN, self::ROLE_REDAKTOR]);
+    }
+
     /** Adminpanelen är för redaktionen; verksamhetsägare får en egen portal. */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->hasAnyRole([self::ROLE_ADMIN, self::ROLE_REDAKTOR]);
+        return $this->isEditorial();
     }
 
     public function businesses(): BelongsToMany
