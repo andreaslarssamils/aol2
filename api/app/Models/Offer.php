@@ -4,15 +4,19 @@ namespace App\Models;
 
 use App\Enums\ContentStatus;
 use App\Enums\DiscountType;
+use App\Http\Requests\OfferRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
 use Database\Factories\OfferFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Http\FormRequest;
 
 /** Erbjudande från ett företag. Går genom revisions-kön och syns via promotions. */
 #[Fillable([
@@ -39,6 +43,27 @@ class Offer extends Model
             'ends_at' => 'datetime',
             'status' => ContentStatus::class,
         ];
+    }
+
+    public static function revisionRequest(): FormRequest
+    {
+        return new OfferRequest;
+    }
+
+    public function revisionBusiness(): ?Business
+    {
+        return $this->business;
+    }
+
+    public function revisionKommun(): ?Kommun
+    {
+        return $this->business?->revisionKommun();
+    }
+
+    #[Scope]
+    protected function inKommun(Builder $query, Kommun|int $kommun): void
+    {
+        $query->whereHas('business', fn (Builder $business) => $business->inKommun($kommun));
     }
 
     public function business(): BelongsTo

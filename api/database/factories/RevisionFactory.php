@@ -34,6 +34,17 @@ class RevisionFactory extends Factory
             'status' => RevisionStatus::Approved,
             'reviewed_by' => User::factory(),
             'reviewed_at' => now(),
+            'applied_at' => now(),
+        ]);
+    }
+
+    public function rejected(): static
+    {
+        return $this->state(fn () => [
+            'status' => RevisionStatus::Rejected,
+            'reviewed_by' => User::factory(),
+            'reviewed_at' => now(),
+            'review_comment' => fake()->sentence(),
         ]);
     }
 }

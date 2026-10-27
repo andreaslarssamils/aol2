@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ContentStatus;
+use App\Http\Requests\PageRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasRevisions;
 use App\Models\Concerns\HasSlugs;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Http\FormRequest;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -45,6 +47,11 @@ class Page extends Model implements HasMedia
     {
         $this->addMediaCollection(Business::MEDIA_PENDING);
         $this->addMediaCollection(Business::MEDIA_IMAGES);
+    }
+
+    public static function revisionRequest(): FormRequest
+    {
+        return new PageRequest;
     }
 
     #[Scope]

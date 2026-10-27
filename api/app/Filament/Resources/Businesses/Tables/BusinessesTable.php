@@ -66,8 +66,7 @@ class BusinessesTable
                     ->searchable()
                     ->query(fn (Builder $query, array $data): Builder => $query->when(
                         $data['value'] ?? null,
-                        fn (Builder $query, int|string $kommunId): Builder => $query
-                            ->whereHas('locations', fn (Builder $locations) => $locations->where('kommun_id', $kommunId)),
+                        fn (Builder $query, int|string $kommunId): Builder => $query->inKommun((int) $kommunId),
                     )),
                 SelectFilter::make('status')
                     ->label('Status')

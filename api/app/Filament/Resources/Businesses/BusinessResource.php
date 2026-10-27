@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Businesses;
 
+use App\Filament\RelationManagers\RevisionsRelationManager;
 use App\Filament\Resources\Businesses\Pages\CreateBusiness;
 use App\Filament\Resources\Businesses\Pages\EditBusiness;
 use App\Filament\Resources\Businesses\Pages\ListBusinesses;
@@ -51,6 +52,7 @@ class BusinessResource extends Resource
         return [
             LocationsRelationManager::class,
             UsersRelationManager::class,
+            RevisionsRelationManager::class,
         ];
     }
 

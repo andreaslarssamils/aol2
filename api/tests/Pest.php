@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +45,12 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Fälten en revision får föreslå för modellen: alla fillable utom dem som bara redaktionen sätter.
+ *
+ * @return list<string>
+ */
+function revisionPayloadFields(Model $model): array
 {
-    // ..
+    return array_values(array_diff($model->getFillable(), ['status', 'published_at', 'auto_approve', 'managed_by']));
 }

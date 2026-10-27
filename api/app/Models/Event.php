@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ContentStatus;
+use App\Http\Requests\EventRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Http\FormRequest;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -58,6 +60,17 @@ class Event extends Model implements HasMedia
     {
         $this->addMediaCollection(Business::MEDIA_PENDING);
         $this->addMediaCollection(Business::MEDIA_IMAGES);
+    }
+
+    public static function revisionRequest(): FormRequest
+    {
+        return new EventRequest;
+    }
+
+    /** Arrangörens verksamhet, om eventet hör till en lokalisering i katalogen. */
+    public function revisionBusiness(): ?Business
+    {
+        return $this->businessLocation?->business;
     }
 
     public function kommun(): BelongsTo

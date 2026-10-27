@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Events;
 
+use App\Filament\RelationManagers\RevisionsRelationManager;
 use App\Filament\Resources\Events\Pages\CreateEvent;
 use App\Filament\Resources\Events\Pages\EditEvent;
 use App\Filament\Resources\Events\Pages\ListEvents;
@@ -42,6 +43,13 @@ class EventResource extends Resource
     public static function table(Table $table): Table
     {
         return EventsTable::configure($table);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RevisionsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

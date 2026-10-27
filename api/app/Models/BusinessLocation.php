@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Requests\BusinessLocationRequest;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
 use App\Models\Concerns\HasSlugs;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Var ett företag finns – en rad per adress. Flera rader per ort är tillåtet,
@@ -46,6 +48,22 @@ class BusinessLocation extends Model
     protected function displayName(): Attribute
     {
         return Attribute::get(fn () => $this->namn ?? $this->business?->namn);
+    }
+
+    /** Adressuppgifter och slug. Öppettider är egna rader och ingår inte. */
+    public static function revisionRequest(): FormRequest
+    {
+        return new BusinessLocationRequest;
+    }
+
+    public function revisionBusiness(): ?Business
+    {
+        return $this->business;
+    }
+
+    public function revisionTitle(): string
+    {
+        return $this->display_name;
     }
 
     /** Öppettider ett visst datum. En avvikelse vinner alltid över ordinarie tider. */

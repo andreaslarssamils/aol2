@@ -6,16 +6,20 @@ use App\Enums\BusinessKind;
 use App\Enums\BusinessUserRole;
 use App\Enums\ContentStatus;
 use App\Enums\ManagedBy;
+use App\Http\Requests\BusinessRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasRevisions;
 use Database\Factories\BusinessFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Http\FormRequest;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
@@ -60,6 +64,30 @@ class Business extends Model implements HasMedia
     {
         $this->addMediaCollection(self::MEDIA_PENDING);
         $this->addMediaCollection(self::MEDIA_IMAGES);
+    }
+
+    /** Fälten en ägare får föreslå via revisioner. kind, managed_by och auto_approve sätts bara av redaktionen. */
+    public static function revisionRequest(): FormRequest
+    {
+        return new BusinessRequest;
+    }
+
+    /** Verksamheten avgör själv om dess revisioner godkänns automatiskt. */
+    public function revisionBusiness(): ?Business
+    {
+        return $this;
+    }
+
+    public function revisionKommun(): ?Kommun
+    {
+        return $this->primaryLocation?->kommun;
+    }
+
+    /** Verksamheten har ingen egen kommun – matcha mot lokaliseringarnas. */
+    #[Scope]
+    protected function inKommun(Builder $query, Kommun|int $kommun): void
+    {
+        $query->whereHas('locations', fn (Builder $locations) => $locations->inKommun($kommun));
     }
 
     public function users(): BelongsToMany

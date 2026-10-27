@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Pages;
 
+use App\Filament\RelationManagers\RevisionsRelationManager;
 use App\Filament\Resources\Pages\Pages\CreatePage;
 use App\Filament\Resources\Pages\Pages\EditPage;
 use App\Filament\Resources\Pages\Pages\ListPages;
@@ -48,6 +49,13 @@ class PageResource extends Resource
     public static function table(Table $table): Table
     {
         return PagesTable::configure($table);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RevisionsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

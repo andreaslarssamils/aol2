@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Articles;
 
+use App\Filament\RelationManagers\RevisionsRelationManager;
 use App\Filament\Resources\Articles\Pages\CreateArticle;
 use App\Filament\Resources\Articles\Pages\EditArticle;
 use App\Filament\Resources\Articles\Pages\ListArticles;
@@ -48,6 +49,13 @@ class ArticleResource extends Resource
     public static function table(Table $table): Table
     {
         return ArticlesTable::configure($table);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RevisionsRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
