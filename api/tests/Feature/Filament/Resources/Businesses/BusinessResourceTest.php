@@ -92,7 +92,7 @@ it('updates a business', function () {
     ]);
 });
 
-it('creates a location with opening hours, an exception and a slug through the relation manager', function () {
+it('creates a published location with opening hours, an exception and a slug through the relation manager', function () {
     $this->actingAs(User::factory()->redaktor()->create());
     $business = Business::factory()->create(['namn' => 'Café Kaka']);
     $kommun = Kommun::factory()->create();
@@ -108,6 +108,8 @@ it('creates a location with opening hours, an exception and a slug through the r
             'postnummer' => '771 30',
             'ort' => 'Ludvika',
             'is_primary' => true,
+            'status' => ContentStatus::Published->value,
+            'published_at' => '2026-10-28 09:00:00',
             'slugs' => ['sv' => '', 'en' => 'cafe-kaka-ludvika'],
             'openingHours' => [
                 ['weekday' => 0, 'opens' => '11:00', 'closes' => '14:00', 'closed' => false],
@@ -125,6 +127,8 @@ it('creates a location with opening hours, an exception and a slug through the r
     expect($location->business->is($business))->toBeTrue()
         ->and($location->kommun_id)->toBe($kommun->id)
         ->and($location->display_name)->toBe('Café Kaka')
+        ->and($location->status)->toBe(ContentStatus::Published)
+        ->and($location->published_at->toDateTimeString())->toBe('2026-10-28 09:00:00')
         ->and($location->slugFor('sv'))->toBe('cafe-kaka')
         ->and($location->slugFor('en'))->toBe('cafe-kaka-ludvika')
         ->and($location->openingHours->pluck('opens')->all())->toBe(['11:00:00', '17:00:00', null])

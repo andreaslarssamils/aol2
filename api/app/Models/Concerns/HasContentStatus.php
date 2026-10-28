@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Builder;
 /** Modeller med status (ContentStatus) + published_at. */
 trait HasContentStatus
 {
+    /** Kolumnen kvalificeras så att scopet fungerar även i joins där flera tabeller har status. */
     #[Scope]
     protected function published(Builder $query): void
     {
-        $query->where('status', ContentStatus::Published);
+        $query->where($query->qualifyColumn('status'), ContentStatus::Published);
     }
 
     public function isPublished(): bool

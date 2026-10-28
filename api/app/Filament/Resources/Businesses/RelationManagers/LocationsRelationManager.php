@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Businesses\RelationManagers;
 
+use App\Filament\Forms\Components\ContentStatusSelect;
 use App\Filament\Forms\Components\KommunSelect;
 use App\Filament\Forms\Components\SlugInput;
 use App\Filament\Infolists\Components\SlugHistoryEntry;
@@ -14,6 +15,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -155,6 +157,15 @@ class LocationsRelationManager extends RelationManager
                             ->addActionLabel('Lägg till avvikelse'),
                     ])
                     ->collapsible(),
+                Section::make('Publicering')
+                    ->description('Bara publicerade lokaliseringar vars verksamhet också är publicerad syns i katalogen.')
+                    ->schema([
+                        ContentStatusSelect::make(),
+                        DateTimePicker::make('published_at')
+                            ->label('Publicerad')
+                            ->seconds(false),
+                    ])
+                    ->columns(2),
             ]);
     }
 
@@ -180,6 +191,10 @@ class LocationsRelationManager extends RelationManager
                 IconColumn::make('is_primary')
                     ->label('Primär')
                     ->boolean(),
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->sortable(),
                 TextColumn::make('slug')
                     ->label('Slug')
                     ->state(fn (BusinessLocation $record): ?string => $record->slugFor(LocaleTabs::defaultLocale()))

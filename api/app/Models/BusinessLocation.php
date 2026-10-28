@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Enums\ContentStatus;
 use App\Http\Requests\BusinessLocationRequest;
+use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
 use App\Models\Concerns\HasSlugs;
 use Carbon\CarbonInterface;
 use Database\Factories\BusinessLocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,20 +23,22 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Var ett företag finns – en rad per adress. Flera rader per ort är tillåtet,
- * men bara en kan vara primär. URL:en bor i slugs-tabellen. Öppettider och lunch hänger här.
+ * Var ett företag finns – en rad per adress. Flera rader per ort är tillåtet, men bara en kan
+ * vara primär. URL:en bor i slugs-tabellen. Öppettider och lunch hänger här. Har egen status:
+ * en lokalisering som skapas via revision är draft tills den godkänns, precis som annat innehåll.
  */
 #[Fillable([
     'business_id', 'kommun_id', 'namn', 'telefon', 'adress',
-    'postnummer', 'ort', 'lat', 'lng', 'is_primary',
+    'postnummer', 'ort', 'lat', 'lng', 'is_primary', 'status', 'published_at',
 ])]
 class BusinessLocation extends Model
 {
     /** @use HasFactory<BusinessLocationFactory> */
-    use HasFactory, HasPromotions, HasRevisions, HasSlugs, SoftDeletes;
+    use HasContentStatus, HasFactory, HasPromotions, HasRevisions, HasSlugs, SoftDeletes;
 
     protected $attributes = [
         'is_primary' => true,
+        'status' => ContentStatus::Draft->value,
     ];
 
     protected function casts(): array
@@ -41,7 +47,16 @@ class BusinessLocation extends Model
             'lat' => 'decimal:7',
             'lng' => 'decimal:7',
             'is_primary' => 'boolean',
+            'status' => ContentStatus::class,
+            'published_at' => 'datetime',
         ];
+    }
+
+    /** Det katalogen visar: publicerad lokalisering vars företag också är publicerat (och inget av dem raderat). */
+    #[Scope]
+    protected function inCatalog(Builder $query): void
+    {
+        $query->published()->whereHas('business', fn (Builder $business) => $business->published());
     }
 
     /** Lokalt namn om satt ("Acme Centrum"), annars företagsnamnet. */

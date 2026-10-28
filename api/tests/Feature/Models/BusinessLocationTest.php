@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ContentStatus;
 use App\Models\Business;
 use App\Models\BusinessLocation;
 use App\Models\Kommun;
@@ -81,4 +82,20 @@ it('lets an exception win over the regular hours for that date', function () {
         ->and($onTheDay->first()->closed)->toBeTrue()
         ->and($weekAfter->first())->toBeInstanceOf(OpeningHour::class)
         ->and($weekAfter->first()->opens)->toBe('09:00:00');
+});
+
+it('shows only published locations of published businesses in the catalog', function () {
+    $visible = BusinessLocation::factory()->for(Business::factory()->published())->create();
+    $draftLocation = BusinessLocation::factory()->draft()->for(Business::factory()->published())->create();
+    $draftBusiness = BusinessLocation::factory()->for(Business::factory())->create();
+    $archivedBusiness = BusinessLocation::factory()->for(Business::factory()->create(['status' => ContentStatus::Archived]))->create();
+    $closed = BusinessLocation::factory()->for(Business::factory()->published())->create();
+    $closed->delete();
+    $deletedBusiness = Business::factory()->published()->create();
+    $orphan = BusinessLocation::factory()->for($deletedBusiness)->create();
+    $deletedBusiness->delete();
+
+    // published() ser bara till lokaliseringens egen status – företagets status och radering väger katalog-scopet in.
+    expect(BusinessLocation::inCatalog()->pluck('id')->all())->toBe([$visible->id])
+        ->and(BusinessLocation::published()->pluck('id')->all())->toEqualCanonicalizing([$visible->id, $draftBusiness->id, $archivedBusiness->id, $orphan->id]);
 });

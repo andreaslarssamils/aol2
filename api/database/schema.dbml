@@ -56,6 +56,11 @@
 //    raderna städas först vid hård radering (HasSlugs).
 //  - setSlug() krockar aldrig: upptagen slug får suffix -2, -3 ... inom locale/kommun/typ.
 //  - slugs.locale varchar(8), newsletter_subscribers.consent_ip varchar(45).
+//  - business_locations.status + published_at (2026-10-28): v4 gav lokaliseringar ingen egen
+//    status, men de går genom godkännandeflödet som allt annat (revisionable_type business_location).
+//    Utan status blev en ny filial synlig i katalogen så fort utkastraden fanns, innan revisionen var
+//    godkänd. Nu gäller samma regel som för resten: draft tills ApproveRevision publicerar, och
+//    katalogen visar bara published-rader vars företag också är published.
 // ============================================
 // ---------- Enums (dokumentation, implementeras som varchar) ----------
 // v4: pending och rejected borttagna – de bodde redan i revision_status
@@ -286,14 +291,16 @@ Table business_locations {
   lat decimal(10,7) [null]
   lng decimal(10,7) [null]
   is_primary boolean [default: true]
+  status content_status [default: 'draft', note: 'Tillagd 2026-10-28: en lokalisering som skapas via revision måste vara osynlig tills den godkänns – samma publiceringsregel som allt annat innehåll. Sätts till published av ApproveRevision eller redaktionen.']
+  published_at timestamp [null]
   created_at timestamp
   updated_at timestamp
   deleted_at timestamp [null, note: 'En nedlagd filial ska inte hårdraderas']
   indexes {
     (business_id, kommun_id) [note: 'v4: INTE unikt längre – två pizzerior med samma ägare i Ludvika, två butiker på olika gator. Lägg dessutom UNIQUE (business_id) WHERE is_primary AND deleted_at IS NULL, annars kan flera locations vara primära samtidigt.']
-    kommun_id [note: 'Driver listsidorna via join']
+    (kommun_id, status) [note: 'Driver katalogens listsidor: kommun_id IN (...) AND status = published']
   }
-  Note: 'URL:en bor i slugs-tabellen (per språk och ort). De flesta företag har exakt en rad här. Öppettider och lunch hänger på lokaliseringen.'
+  Note: 'URL:en bor i slugs-tabellen (per språk och ort). De flesta företag har exakt en rad här. Öppettider och lunch hänger på lokaliseringen. Katalogen visar bara rader med status published vars företag också är published.'
 }
 Ref: business_locations.business_id > businesses.id [delete: cascade]
 Ref: business_locations.kommun_id > kommuner.id [delete: restrict]

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ContentStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -9,7 +10,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // URL:en bor i slugs-tabellen. Flera rader per företag och ort är tillåtet.
+        // URL:en bor i slugs-tabellen. Flera rader per företag och ort är tillåtet. Status följer
+        // samma publiceringsregel som allt annat: en lokalisering skapad via revision är draft tills
+        // den godkänns, och katalogen visar bara published-rader vars företag också är published.
         Schema::create('business_locations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('business_id')->constrained()->cascadeOnDelete();
@@ -22,11 +25,13 @@ return new class extends Migration
             $table->decimal('lat', 10, 7)->nullable();
             $table->decimal('lng', 10, 7)->nullable();
             $table->boolean('is_primary')->default(true);
+            $table->string('status')->default(ContentStatus::Draft->value);
+            $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
             $table->index(['business_id', 'kommun_id']);
-            $table->index('kommun_id'); // Driver listsidorna via join
+            $table->index(['kommun_id', 'status']); // Driver katalogens listsidor
         });
 
         // Bara en primär lokalisering per företag bland de som inte är raderade.

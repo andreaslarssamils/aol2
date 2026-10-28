@@ -250,3 +250,32 @@ it('lets the editorial team move content between businesses and create it under 
     'admin' => fn () => User::factory()->admin()->create(),
     'redaktör' => fn () => User::factory()->redaktor()->create(),
 ]);
+
+it('keeps a new location out of the published scope until its revision is approved', function () {
+    $owner = User::factory()->verksamhetsagare()->create();
+    $business = Business::factory()->published()->create();
+    $business->addUser($owner);
+
+    $revision = app(SubmitRevision::class)->handle(new BusinessLocation, [
+        'business_id' => $business->id,
+        'kommun_id' => Kommun::factory()->create()->id,
+        'adress' => 'Storgatan 1',
+    ], $owner);
+
+    $location = $revision->revisionable;
+
+    expect($location->status)->toBe(ContentStatus::Draft)
+        ->and($location->published_at)->toBeNull()
+        ->and(BusinessLocation::published()->whereKey($location)->exists())->toBeFalse()
+        ->and(BusinessLocation::inCatalog()->whereKey($location)->exists())->toBeFalse();
+
+    $this->freezeSecond();
+    app(ApproveRevision::class)->handle($revision, User::factory()->redaktor()->create());
+
+    $location->refresh();
+
+    expect($location->status)->toBe(ContentStatus::Published)
+        ->and($location->published_at)->toEqual(now())
+        ->and(BusinessLocation::published()->whereKey($location)->exists())->toBeTrue()
+        ->and(BusinessLocation::inCatalog()->whereKey($location)->exists())->toBeTrue();
+});
