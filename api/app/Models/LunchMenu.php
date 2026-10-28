@@ -6,8 +6,11 @@ use App\Enums\ContentStatus;
 use App\Http\Requests\LunchMenuRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasRevisions;
+use App\Observers\ApiCacheObserver;
+use Carbon\CarbonInterface;
 use Database\Factories\LunchMenuFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,6 +21,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /** Veckans lunch per lokalisering. menu: {"mon": [...], "tue": [...]}. */
 #[Fillable(['business_location_id', 'iso_year', 'week', 'menu', 'status', 'published_at'])]
+#[ObservedBy([ApiCacheObserver::class])]
 class LunchMenu extends Model
 {
     /** @use HasFactory<LunchMenuFactory> */
@@ -56,6 +60,13 @@ class LunchMenu extends Model
     public function revisionKommun(): ?Kommun
     {
         return $this->businessLocation?->kommun;
+    }
+
+    /** Menyn för datumets ISO-vecka – vecka 1 kan börja i december, därför iso_year. */
+    #[Scope]
+    protected function forIsoWeek(Builder $query, CarbonInterface $date): void
+    {
+        $query->where('iso_year', $date->isoWeekYear)->where('week', $date->isoWeek);
     }
 
     #[Scope]

@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Enums\SiteStatus;
+use App\Observers\ApiCacheObserver;
 use Database\Factories\SiteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\RouteKey;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  */
 #[Fillable(['namn', 'slug', 'domain', 'primary_kommun_id', 'status', 'settings'])]
 #[RouteKey('slug')]
+#[ObservedBy([ApiCacheObserver::class])]
 class Site extends Model
 {
     /** @use HasFactory<SiteFactory> */

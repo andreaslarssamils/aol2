@@ -1,0 +1,1888 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Allt om – publikt läs-API",
+        "version": "1.0.0",
+        "description": "Läs-API för Next.js-frontenden. Alla anrop ligger under `/api/v1/{site}` där `{site}` är sajtens slug; bara aktiva sajter svarar (annars 404).\n\nBara publicerat innehåll i sajtens kommuner returneras – aldrig utkast, arkiverat, raderat, väntande revisioner eller väntande media.\n\nSpråk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. Slugs är alltid den kanoniska för valt språk.\n\n**301 utan Location-header.** Anropas en `{slug}`-resurs med en gammal slug, eller med sluggen för ett annat språk än det valda, svarar API:et `301` med `{\"redirect_to\": \"<kanonisk slug>\"}` i body och **ingen** `Location`-header. HTTP-klienter följer därför inte omdirigeringen själva (fetch returnerar 301-svaret som det är). Frontend bygger den kanoniska URL:en av `redirect_to` och svarar besökaren med en egen 301/308. Svaret har ingen ETag och cachas inte.\n\nAlla lyckade svar har `ETag` och svarar 304 på matchande `If-None-Match`. Svaren cachas per sajt och typ på servern och töms när innehåll publiceras eller avpubliceras.\n\nTidsstämplar är ISO 8601 med UTC-offset. Öppettider, dagens lunch, innevarande vecka och datumparametrar tolkas i appens tidszon (`Europe/Stockholm`)."
+    },
+    "servers": [
+        {
+            "url": "/api/v1",
+            "description": "Relativt specens host – samma Laravel-app som serverar /openapi.json."
+        }
+    ],
+    "tags": [
+        {
+            "name": "Sajt"
+        },
+        {
+            "name": "Startsida"
+        },
+        {
+            "name": "Verksamheter"
+        },
+        {
+            "name": "Evenemang"
+        },
+        {
+            "name": "Reportage"
+        },
+        {
+            "name": "Sidor"
+        },
+        {
+            "name": "Promotions"
+        }
+    ],
+    "paths": {
+        "/{site}/site": {
+            "get": {
+                "tags": [
+                    "Sajt"
+                ],
+                "summary": "Sajten",
+                "description": "Sajt, kommuner (primärkommunen först), primärkommun och inställningar.",
+                "operationId": "getSite",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sajten",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Site"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/home": {
+            "get": {
+                "tags": [
+                    "Startsida"
+                ],
+                "summary": "Startsidan i ett anrop",
+                "description": "Utvalda reportage (3), kommande evenemang (6), aktiva promotions för ytan \"startsida\", dagens lunchmenyer och väder (null tills SMHI kopplas på).",
+                "operationId": "getHome",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Startsidans innehåll",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Home"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/businesses": {
+            "get": {
+                "tags": [
+                    "Verksamheter"
+                ],
+                "summary": "Lokaliseringar i katalogen",
+                "description": "Paginerad lista över publicerade lokaliseringar vars företag också är publicerat, sorterad på visningsnamn (lokalt namn, annars företagets). `open_now` räknas via öppettider och avvikelser för dagen.",
+                "operationId": "listBusinesses",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    },
+                    {
+                        "$ref": "#/components/parameters/page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/per_page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/category"
+                    },
+                    {
+                        "$ref": "#/components/parameters/q"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lokaliseringar",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/BusinessLocation"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/businesses/{slug}": {
+            "get": {
+                "tags": [
+                    "Verksamheter"
+                ],
+                "summary": "En lokalisering",
+                "description": "Lokaliseringen med företaget, veckans öppettider inklusive avvikelser, aktuell lunchmeny (innevarande ISO-vecka), bilder och kommande evenemang på platsen. Gammal eller annan-språkig slug ger 301 utan Location-header, se svaret 301.",
+                "operationId": "getBusiness",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/slug"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lokaliseringen",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/BusinessLocationDetail"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "301": {
+                        "$ref": "#/components/responses/Redirect"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/events": {
+            "get": {
+                "tags": [
+                    "Evenemang"
+                ],
+                "summary": "Evenemangskalendern",
+                "description": "Paginerad lista sorterad på starttid. Innehåller engångsevent och förekomster av återkommande event (`parent_event_id` satt) – inte mallposterna med `recurrence_rule`. Utan `from` visas allt som pågår eller börjar från och med nu.",
+                "operationId": "listEvents",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    },
+                    {
+                        "$ref": "#/components/parameters/page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/per_page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/to"
+                    },
+                    {
+                        "$ref": "#/components/parameters/eventCategory"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Evenemang",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Event"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/events/{slug}": {
+            "get": {
+                "tags": [
+                    "Evenemang"
+                ],
+                "summary": "Ett evenemang",
+                "description": "Gammal eller annan-språkig slug ger 301 utan Location-header, se svaret 301.",
+                "operationId": "getEvent",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/slug"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Evenemanget",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Event"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "301": {
+                        "$ref": "#/components/responses/Redirect"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/articles": {
+            "get": {
+                "tags": [
+                    "Reportage"
+                ],
+                "summary": "Reportage",
+                "description": "Paginerad lista, nyast först. Med `featured=1` sorteras utvalda reportage överst.",
+                "operationId": "listArticles",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    },
+                    {
+                        "$ref": "#/components/parameters/page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/per_page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/featured"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reportage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Article"
+                                            }
+                                        },
+                                        "links": {
+                                            "$ref": "#/components/schemas/PaginationLinks"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/articles/{slug}": {
+            "get": {
+                "tags": [
+                    "Reportage"
+                ],
+                "summary": "Ett reportage",
+                "description": "Gammal eller annan-språkig slug ger 301 utan Location-header, se svaret 301.",
+                "operationId": "getArticle",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/slug"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reportaget",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ArticleDetail"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "301": {
+                        "$ref": "#/components/responses/Redirect"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/pages/{slug}": {
+            "get": {
+                "tags": [
+                    "Sidor"
+                ],
+                "summary": "En statisk sida",
+                "description": "En sida i någon av sajtens kommuner vinner över en nationell sida med samma slug. Gammal eller annan-språkig slug ger 301 utan Location-header, se svaret 301.",
+                "operationId": "getPage",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/slug"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sidan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Page"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "301": {
+                        "$ref": "#/components/responses/Redirect"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/promotions": {
+            "get": {
+                "tags": [
+                    "Promotions"
+                ],
+                "summary": "Aktiva placeringar",
+                "description": "Placeringar med status active vars tidsfönster omfattar nu, riktade mot sajtens kommuner och med publicerat innehåll. Högst prioritet först. `is_paid` betyder att en \"Annons\"-etikett ska visas; `link` pekar på innehållets kanoniska URL på dess hemsajt.",
+                "operationId": "listPromotions",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    },
+                    {
+                        "$ref": "#/components/parameters/placement"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Placeringar",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Promotion"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "parameters": {
+            "site": {
+                "name": "site",
+                "in": "path",
+                "required": true,
+                "description": "Sajtens slug (sites.slug).",
+                "schema": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9-]+$"
+                }
+            },
+            "slug": {
+                "name": "slug",
+                "in": "path",
+                "required": true,
+                "description": "Innehållets slug – kanonisk eller gammal. En gammal slug ger 301.",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "locale": {
+                "name": "locale",
+                "in": "query",
+                "required": false,
+                "description": "Innehållsspråk. Vinner över Accept-Language; okända värden faller tillbaka till standardspråket.",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "sv",
+                        "en"
+                    ],
+                    "default": "sv"
+                }
+            },
+            "page": {
+                "name": "page",
+                "in": "query",
+                "required": false,
+                "description": "Sida (1-baserad).",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1
+                }
+            },
+            "per_page": {
+                "name": "per_page",
+                "in": "query",
+                "required": false,
+                "description": "Rader per sida.",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 20
+                }
+            },
+            "category": {
+                "name": "category",
+                "in": "query",
+                "required": false,
+                "description": "Kategorislug (type business).",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "eventCategory": {
+                "name": "category",
+                "in": "query",
+                "required": false,
+                "description": "Kategorislug (type event).",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "q": {
+                "name": "q",
+                "in": "query",
+                "required": false,
+                "description": "Fritextsök på lokaliseringens namn, ort och företagets namn.",
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "from": {
+                "name": "from",
+                "in": "query",
+                "required": false,
+                "description": "Visa evenemang som pågår eller börjar från och med denna tidpunkt (datum eller ISO 8601, ett rent datum tolkas i appens tidszon). Standard: nu.",
+                "schema": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            },
+            "to": {
+                "name": "to",
+                "in": "query",
+                "required": false,
+                "description": "Visa evenemang som börjar senast denna tidpunkt. Ett rent datum gäller hela dagen.",
+                "schema": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            },
+            "featured": {
+                "name": "featured",
+                "in": "query",
+                "required": false,
+                "description": "Sortera utvalda reportage först.",
+                "schema": {
+                    "type": "boolean"
+                }
+            },
+            "placement": {
+                "name": "placement",
+                "in": "query",
+                "required": false,
+                "description": "Avgränsa till en yta.",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "startsida",
+                        "kategorisida",
+                        "evenemangskalender",
+                        "nyhetsbrev"
+                    ]
+                }
+            }
+        },
+        "responses": {
+            "NotModified": {
+                "description": "If-None-Match matchade svarets ETag."
+            },
+            "NotFound": {
+                "description": "Sajten är inte aktiv, eller innehållet finns inte, är opublicerat eller hör till en annan kommun.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Error"
+                        }
+                    }
+                }
+            },
+            "Redirect": {
+                "description": "Sluggen är inte den kanoniska för valt språk (gammal slug eller annat språks slug). Svaret är 301 UTAN Location-header, så klienten följer inte omdirigeringen själv: bygg den kanoniska URL:en av `redirect_to` (bara sluggen, inte en URL) och omdirigera besökaren själv. Ingen ETag, cachas inte.",
+                "x-redirect-without-location": true,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/Redirect"
+                        }
+                    }
+                }
+            },
+            "ValidationError": {
+                "description": "Ogiltiga frågeparametrar.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        }
+                    }
+                }
+            }
+        },
+        "schemas": {
+            "Error": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "ValidationError": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    },
+                    "errors": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "message",
+                    "errors"
+                ]
+            },
+            "Redirect": {
+                "type": "object",
+                "properties": {
+                    "redirect_to": {
+                        "type": "string",
+                        "description": "Kanonisk slug för valt språk – bara sluggen, inte en URL. Svaret saknar Location-header.",
+                        "example": "pubquiz-tisdagar"
+                    }
+                },
+                "required": [
+                    "redirect_to"
+                ]
+            },
+            "PaginationLinks": {
+                "type": "object",
+                "properties": {
+                    "first": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "last": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "prev": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "next": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "first",
+                    "last",
+                    "prev",
+                    "next"
+                ]
+            },
+            "PaginationMeta": {
+                "type": "object",
+                "properties": {
+                    "current_page": {
+                        "type": "integer"
+                    },
+                    "from": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "last_page": {
+                        "type": "integer"
+                    },
+                    "links": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "per_page": {
+                        "type": "integer"
+                    },
+                    "to": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "current_page",
+                    "from",
+                    "last_page",
+                    "links",
+                    "path",
+                    "per_page",
+                    "to",
+                    "total"
+                ]
+            },
+            "Kommun": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "namn": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "kod": {
+                        "type": "string",
+                        "description": "SCB-kod, t.ex. \"2085\"."
+                    },
+                    "lat": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "lng": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "namn",
+                    "slug",
+                    "kod",
+                    "lat",
+                    "lng"
+                ]
+            },
+            "Site": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string"
+                    },
+                    "namn": {
+                        "type": "string"
+                    },
+                    "domain": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "primary_kommun": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Kommun"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "kommuner": {
+                        "type": "array",
+                        "description": "Primärkommunen först.",
+                        "items": {
+                            "$ref": "#/components/schemas/Kommun"
+                        }
+                    },
+                    "settings": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                },
+                "required": [
+                    "slug",
+                    "namn",
+                    "domain",
+                    "primary_kommun",
+                    "kommuner",
+                    "settings"
+                ]
+            },
+            "Category": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string"
+                    },
+                    "namn": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "business",
+                            "event",
+                            "sport"
+                        ]
+                    },
+                    "icon": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "slug",
+                    "namn",
+                    "type",
+                    "icon"
+                ]
+            },
+            "Media": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "alt": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "width": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "height": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "mime_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "url",
+                    "alt",
+                    "width",
+                    "height",
+                    "mime_type"
+                ]
+            },
+            "BusinessSummary": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "namn": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "company",
+                            "association"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "namn",
+                    "kind"
+                ]
+            },
+            "Business": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "namn": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "company",
+                            "association"
+                        ]
+                    },
+                    "beskrivning": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "epost": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "webbplats": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "categories": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Category"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "namn",
+                    "kind",
+                    "beskrivning",
+                    "epost",
+                    "webbplats",
+                    "categories"
+                ]
+            },
+            "BusinessLocation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "namn": {
+                        "type": "string",
+                        "description": "Lokalt namn, annars företagets."
+                    },
+                    "business": {
+                        "$ref": "#/components/schemas/BusinessSummary"
+                    },
+                    "categories": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Category"
+                        }
+                    },
+                    "adress": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "postnummer": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "ort": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "telefon": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "lat": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "lng": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "is_primary": {
+                        "type": "boolean"
+                    },
+                    "kommun": {
+                        "$ref": "#/components/schemas/Kommun"
+                    },
+                    "open_now": {
+                        "type": "boolean",
+                        "description": "Öppet just nu enligt öppettider och avvikelser, i appens tidszon."
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Media"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "namn",
+                    "business",
+                    "categories",
+                    "adress",
+                    "postnummer",
+                    "ort",
+                    "telefon",
+                    "lat",
+                    "lng",
+                    "is_primary",
+                    "kommun",
+                    "open_now",
+                    "images"
+                ]
+            },
+            "OpeningInterval": {
+                "type": "object",
+                "properties": {
+                    "opens": {
+                        "type": "string",
+                        "example": "09:00"
+                    },
+                    "closes": {
+                        "type": "string",
+                        "example": "17:00"
+                    }
+                },
+                "required": [
+                    "opens",
+                    "closes"
+                ]
+            },
+            "OpeningDay": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "weekday": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6,
+                        "description": "0 = måndag ... 6 = söndag"
+                    },
+                    "closed": {
+                        "type": "boolean"
+                    },
+                    "is_exception": {
+                        "type": "boolean",
+                        "description": "Dagen styrs av en avvikelse (röd dag, semester)."
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "intervals": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OpeningInterval"
+                        }
+                    }
+                },
+                "required": [
+                    "date",
+                    "weekday",
+                    "closed",
+                    "is_exception",
+                    "note",
+                    "intervals"
+                ]
+            },
+            "LunchMenu": {
+                "type": "object",
+                "properties": {
+                    "iso_year": {
+                        "type": "integer"
+                    },
+                    "week": {
+                        "type": "integer"
+                    },
+                    "menu": {
+                        "type": "object",
+                        "description": "{\"mon\": [...], ..., \"sun\": [...]}",
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "today": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Dagens rätter, i appens tidszon."
+                    },
+                    "location": {
+                        "type": "object",
+                        "properties": {
+                            "slug": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "namn": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "iso_year",
+                    "week",
+                    "menu",
+                    "today"
+                ]
+            },
+            "BusinessLocationDetail": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/BusinessLocation"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "business": {
+                                "$ref": "#/components/schemas/Business"
+                            },
+                            "opening_hours": {
+                                "type": "array",
+                                "description": "Måndag till söndag innevarande vecka.",
+                                "items": {
+                                    "$ref": "#/components/schemas/OpeningDay"
+                                },
+                                "minItems": 7,
+                                "maxItems": 7
+                            },
+                            "lunch_menu": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/LunchMenu"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "upcoming_events": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/Event"
+                                }
+                            }
+                        },
+                        "required": [
+                            "business",
+                            "opening_hours",
+                            "lunch_menu",
+                            "upcoming_events"
+                        ]
+                    }
+                ]
+            },
+            "Event": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "namn": {
+                        "type": "string"
+                    },
+                    "beskrivning": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "all_day": {
+                        "type": "boolean"
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "ends_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "venue_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "adress": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "lat": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "lng": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "pris": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "ticket_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "kommun": {
+                        "$ref": "#/components/schemas/Kommun"
+                    },
+                    "categories": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Category"
+                        }
+                    },
+                    "location": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "description": "Platsen i katalogen, om dess företag är publicerat.",
+                        "properties": {
+                            "slug": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "namn": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        }
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Media"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "namn",
+                    "beskrivning",
+                    "all_day",
+                    "starts_at",
+                    "ends_at",
+                    "venue_name",
+                    "adress",
+                    "lat",
+                    "lng",
+                    "pris",
+                    "ticket_url",
+                    "published_at",
+                    "kommun",
+                    "categories",
+                    "location",
+                    "images"
+                ]
+            },
+            "Article": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "titel": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "ingress": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "author_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "featured": {
+                        "type": "boolean"
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "kommun": {
+                        "$ref": "#/components/schemas/Kommun"
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Media"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "titel",
+                    "ingress",
+                    "author_name",
+                    "featured",
+                    "published_at",
+                    "kommun",
+                    "images"
+                ]
+            },
+            "ArticleDetail": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Article"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "body": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "HTML."
+                            }
+                        },
+                        "required": [
+                            "body"
+                        ]
+                    }
+                ]
+            },
+            "Page": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "titel": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "body": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "HTML."
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "kommun": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Kommun"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "null = nationell sida."
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Media"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "titel",
+                    "body",
+                    "published_at",
+                    "kommun",
+                    "images"
+                ]
+            },
+            "Offer": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "titel": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "beskrivning": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "discount_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "percentage",
+                            "fixed",
+                            "freebie",
+                            null
+                        ]
+                    },
+                    "discount_value": {
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "starts_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "ends_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "business": {
+                        "$ref": "#/components/schemas/Business"
+                    }
+                },
+                "required": [
+                    "id",
+                    "titel",
+                    "beskrivning",
+                    "discount_type",
+                    "discount_value",
+                    "code",
+                    "starts_at",
+                    "ends_at",
+                    "business"
+                ]
+            },
+            "Link": {
+                "type": [
+                    "object",
+                    "null"
+                ],
+                "description": "Innehållets kanoniska URL på dess hemsajt. null när innehållet saknar egen sida.",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "business_location",
+                            "event",
+                            "article",
+                            "page"
+                        ]
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "locale": {
+                        "type": "string"
+                    },
+                    "kommun": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "site": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "path": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "example": "/evenemang/nyhammarsfesten"
+                    },
+                    "url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri"
+                    }
+                }
+            },
+            "Promotion": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "placement": {
+                        "type": "string",
+                        "enum": [
+                            "startsida",
+                            "kategorisida",
+                            "evenemangskalender",
+                            "nyhetsbrev"
+                        ]
+                    },
+                    "priority": {
+                        "type": "integer"
+                    },
+                    "is_paid": {
+                        "type": "boolean",
+                        "description": "true → visa \"Annons\"-etikett."
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "ends_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "business_location",
+                            "event",
+                            "article",
+                            "offer"
+                        ]
+                    },
+                    "content": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Event"
+                            },
+                            {
+                                "$ref": "#/components/schemas/Article"
+                            },
+                            {
+                                "$ref": "#/components/schemas/BusinessLocation"
+                            },
+                            {
+                                "$ref": "#/components/schemas/Offer"
+                            }
+                        ]
+                    },
+                    "link": {
+                        "$ref": "#/components/schemas/Link"
+                    }
+                },
+                "required": [
+                    "id",
+                    "placement",
+                    "priority",
+                    "is_paid",
+                    "starts_at",
+                    "ends_at",
+                    "type",
+                    "content",
+                    "link"
+                ]
+            },
+            "Home": {
+                "type": "object",
+                "properties": {
+                    "featured_articles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Article"
+                        }
+                    },
+                    "upcoming_events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Event"
+                        }
+                    },
+                    "promotions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Promotion"
+                        }
+                    },
+                    "lunch_menus": {
+                        "type": "array",
+                        "description": "Restauranger med lunch idag, sorterade på namn.",
+                        "items": {
+                            "$ref": "#/components/schemas/LunchMenu"
+                        }
+                    },
+                    "weather": {
+                        "type": "null",
+                        "description": "Placeholder tills SMHI kopplas på."
+                    }
+                },
+                "required": [
+                    "featured_articles",
+                    "upcoming_events",
+                    "promotions",
+                    "lunch_menus",
+                    "weather"
+                ]
+            }
+        }
+    }
+}

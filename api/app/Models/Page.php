@@ -7,8 +7,10 @@ use App\Http\Requests\PageRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasRevisions;
 use App\Models\Concerns\HasSlugs;
+use App\Observers\ApiCacheObserver;
 use Database\Factories\PageFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +26,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * kommun_id null = nationell sida; en ortspecifik sida med samma slug överskrider den.
  */
 #[Fillable(['kommun_id', 'titel', 'body', 'status', 'published_at'])]
+#[ObservedBy([ApiCacheObserver::class])]
 class Page extends Model implements HasMedia
 {
     /** @use HasFactory<PageFactory> */

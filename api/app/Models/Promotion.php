@@ -4,8 +4,10 @@ namespace App\Models;
 
 use App\Enums\PromotionPlacement;
 use App\Enums\PromotionStatus;
+use App\Observers\ApiCacheObserver;
 use Database\Factories\PromotionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'promotable_type', 'promotable_id', 'kommun_id', 'placement', 'status', 'starts_at', 'ends_at',
     'priority', 'is_paid', 'price', 'invoiced_at', 'created_by',
 ])]
+#[ObservedBy([ApiCacheObserver::class])]
 class Promotion extends Model
 {
     /** @use HasFactory<PromotionFactory> */
@@ -55,6 +58,21 @@ class Promotion extends Model
             ->where(fn (Builder $q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
             ->when($placement, fn (Builder $q) => $q->where('placement', $placement))
             ->orderByDesc('priority');
+    }
+
+    /** Bara placeringar vars innehåll är publicerat och inte raderat – det frontend faktiskt kan länka till. */
+    #[Scope]
+    protected function withPublishedPromotable(Builder $query): void
+    {
+        $query->whereHasMorph(
+            'promotable',
+            [Article::class, Event::class, BusinessLocation::class, Offer::class],
+            function (Builder $promotable, string $type): void {
+                $type === BusinessLocation::class
+                    ? $promotable->inCatalog()
+                    : $promotable->published();
+            },
+        );
     }
 
     public function promotable(): MorphTo

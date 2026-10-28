@@ -8,8 +8,10 @@ use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
 use App\Models\Concerns\HasSlugs;
+use App\Observers\ApiCacheObserver;
 use Database\Factories\ArticleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +25,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
     'kommun_id', 'author_id', 'author_name', 'titel', 'ingress', 'body',
     'featured', 'status', 'published_at',
 ])]
+#[ObservedBy([ApiCacheObserver::class])]
 class Article extends Model implements HasMedia
 {
     /** @use HasFactory<ArticleFactory> */

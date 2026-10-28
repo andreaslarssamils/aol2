@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Observers\ApiCacheObserver;
 use Database\Factories\KommunFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\RouteKey;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
@@ -17,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['lan_id', 'namn', 'kod', 'slug', 'lat', 'lng'])]
 #[RouteKey('slug')]
 #[WithoutTimestamps]
+#[ObservedBy([ApiCacheObserver::class])]
 class Kommun extends Model
 {
     /** @use HasFactory<KommunFactory> */

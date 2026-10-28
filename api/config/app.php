@@ -65,7 +65,9 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Allt innehåll är svenskt: öppettider, lunchveckor och evenemangstider är lokala klockslag
+    // och lagras som sådana. API:et svarar i ISO 8601 med UTC-offset (Carbon::toJSON()).
+    'timezone' => 'Europe/Stockholm',
 
     /*
     |--------------------------------------------------------------------------

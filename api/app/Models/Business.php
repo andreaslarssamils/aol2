@@ -9,8 +9,10 @@ use App\Enums\ManagedBy;
 use App\Http\Requests\BusinessRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasRevisions;
+use App\Observers\ApiCacheObserver;
 use Database\Factories\BusinessFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,6 +33,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
     'kind', 'managed_by', 'auto_approve', 'namn', 'beskrivning',
     'epost', 'webbplats', 'status', 'published_at',
 ])]
+#[ObservedBy([ApiCacheObserver::class])]
 class Business extends Model implements HasMedia
 {
     /** @use HasFactory<BusinessFactory> */

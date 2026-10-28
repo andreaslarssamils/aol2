@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Enums\CategoryType;
+use App\Observers\ApiCacheObserver;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** Nationella kategorier, hierarkiska via parent_id. */
 #[Fillable(['parent_id', 'type', 'namn', 'slug', 'icon', 'sort_order'])]
 #[WithoutTimestamps]
+#[ObservedBy([ApiCacheObserver::class])]
 class Category extends Model
 {
     /** @use HasFactory<CategoryFactory> */

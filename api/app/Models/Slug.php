@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Observers\ApiCacheObserver;
 use Database\Factories\SlugFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * behålls med is_canonical = false så att frontend kan svara 301.
  */
 #[Fillable(['slugable_type', 'slugable_id', 'kommun_id', 'locale', 'slug', 'is_canonical'])]
+#[ObservedBy([ApiCacheObserver::class])]
 class Slug extends Model
 {
     /** @use HasFactory<SlugFactory> */

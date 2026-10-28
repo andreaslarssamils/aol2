@@ -8,8 +8,10 @@ use App\Http\Requests\OfferRequest;
 use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
+use App\Observers\ApiCacheObserver;
 use Database\Factories\OfferFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,6 +25,7 @@ use Illuminate\Foundation\Http\FormRequest;
     'business_id', 'titel', 'beskrivning', 'discount_type', 'discount_value',
     'code', 'starts_at', 'ends_at', 'status',
 ])]
+#[ObservedBy([ApiCacheObserver::class])]
 class Offer extends Model
 {
     /** @use HasFactory<OfferFactory> */

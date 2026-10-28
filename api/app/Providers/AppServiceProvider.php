@@ -10,8 +10,10 @@ use App\Models\LunchMenu;
 use App\Models\Offer;
 use App\Models\Page;
 use App\Models\User;
+use App\Observers\ApiCacheObserver;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,5 +41,8 @@ class AppServiceProvider extends ServiceProvider
             'offer' => Offer::class,
             'page' => Page::class,
         ]);
+
+        // Spaties modell kan inte bära #[ObservedBy] – bilder tömmer API-cachen härifrån.
+        Media::observe(ApiCacheObserver::class);
     }
 }

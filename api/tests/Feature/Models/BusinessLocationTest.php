@@ -99,3 +99,15 @@ it('shows only published locations of published businesses in the catalog', func
     expect(BusinessLocation::inCatalog()->pluck('id')->all())->toBe([$visible->id])
         ->and(BusinessLocation::published()->pluck('id')->all())->toEqualCanonicalizing([$visible->id, $draftBusiness->id, $archivedBusiness->id, $orphan->id]);
 });
+
+it('knows whether it is open at a given time, including intervals past midnight', function () {
+    $location = BusinessLocation::factory()->create();
+    OpeningHour::factory()->for($location)->create(['weekday' => 0, 'opens' => '09:00', 'closes' => '17:00']);
+    OpeningHour::factory()->for($location)->create(['weekday' => 4, 'opens' => '22:00', 'closes' => '02:00']);
+
+    expect($location->isOpenAt(Carbon::parse('2026-11-02 12:00', 'Europe/Stockholm')))->toBeTrue() // måndag
+        ->and($location->isOpenAt(Carbon::parse('2026-11-02 17:00', 'Europe/Stockholm')))->toBeFalse()
+        ->and($location->isOpenAt(Carbon::parse('2026-11-06 23:30', 'Europe/Stockholm')))->toBeTrue() // fredag natt
+        ->and($location->isOpenAt(Carbon::parse('2026-11-07 01:30', 'Europe/Stockholm')))->toBeTrue() // efternatt mot lördag
+        ->and($location->isOpenAt(Carbon::parse('2026-11-07 02:30', 'Europe/Stockholm')))->toBeFalse();
+});

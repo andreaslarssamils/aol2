@@ -8,10 +8,14 @@ use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasPromotions;
 use App\Models\Concerns\HasRevisions;
 use App\Models\Concerns\HasSlugs;
+use App\Observers\ApiCacheObserver;
 use App\Observers\EventObserver;
+use Carbon\CarbonInterface;
 use Database\Factories\EventFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,7 +35,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
     'namn', 'beskrivning', 'all_day', 'starts_at', 'ends_at', 'venue_name', 'adress',
     'lat', 'lng', 'pris', 'ticket_url', 'status', 'published_at',
 ])]
-#[ObservedBy([EventObserver::class])]
+#[ObservedBy([EventObserver::class, ApiCacheObserver::class])]
 class Event extends Model implements HasMedia
 {
     /** @use HasFactory<EventFactory> */
@@ -71,6 +75,23 @@ class Event extends Model implements HasMedia
     public function revisionBusiness(): ?Business
     {
         return $this->businessLocation?->business;
+    }
+
+    /** Bara riktiga poster – engångsevent och förekomster, inte mallposter med recurrence_rule. */
+    #[Scope]
+    protected function withoutRecurrenceTemplates(Builder $query): void
+    {
+        $query->whereNull($query->qualifyColumn('recurrence_rule'));
+    }
+
+    /** Pågående eller kommande: slutar (eller börjar, om sluttid saknas) vid eller efter $at. Jämförs i appens tidszon, som tiderna lagras i. */
+    #[Scope]
+    protected function upcoming(Builder $query, CarbonInterface $at): void
+    {
+        $query->whereRaw(
+            "COALESCE({$query->qualifyColumn('ends_at')}, {$query->qualifyColumn('starts_at')}) >= ?",
+            [$at->copy()->setTimezone(config('app.timezone'))->toDateTimeString()],
+        );
     }
 
     public function kommun(): BelongsTo

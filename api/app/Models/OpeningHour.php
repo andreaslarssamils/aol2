@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Observers\ApiCacheObserver;
 use Database\Factories\OpeningHourFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** En rad per veckodag och lokalisering. weekday: 0 = måndag ... 6 = söndag. */
 #[Fillable(['business_location_id', 'weekday', 'opens', 'closes', 'closed'])]
 #[WithoutTimestamps]
+#[ObservedBy([ApiCacheObserver::class])]
 class OpeningHour extends Model
 {
     /** @use HasFactory<OpeningHourFactory> */

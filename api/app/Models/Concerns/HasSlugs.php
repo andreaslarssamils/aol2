@@ -43,6 +43,18 @@ trait HasSlugs
     }
 
     /**
+     * Kanonisk slug för locale med fallback till standardspråket – det API:et alltid svarar med.
+     * Går via slugs-relationen så att listor som laddat den inte ger en fråga per rad.
+     */
+    public function localizedSlug(string $locale): ?string
+    {
+        $canonical = $this->slugs->where('is_canonical', true);
+
+        return $canonical->firstWhere('locale', $locale)?->slug
+            ?? $canonical->firstWhere('locale', array_key_first(config('app.locales')))?->slug;
+    }
+
+    /**
      * Gör $slug (eller "$slug-2", "$slug-3" ... om den är upptagen av annat innehåll)
      * till kanonisk för $locale. Tidigare kanonisk slug blir icke-kanonisk (301), och en
      * egen gammal slug som återanvänds befordras i stället för att dubbleras.

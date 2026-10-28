@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Observers\ApiCacheObserver;
 use Database\Factories\OpeningHourExceptionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Röda dagar och semesterstängt. Vinner alltid över OpeningHour för sitt datum. */
 #[Fillable(['business_location_id', 'date', 'opens', 'closes', 'closed', 'note'])]
 #[WithoutTimestamps]
+#[ObservedBy([ApiCacheObserver::class])]
 class OpeningHourException extends Model
 {
     /** @use HasFactory<OpeningHourExceptionFactory> */
