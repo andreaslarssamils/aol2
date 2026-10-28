@@ -6,6 +6,7 @@ use App\Enums\BusinessKind;
 use App\Enums\CategoryType;
 use App\Enums\DiscountType;
 use App\Enums\PromotionPlacement;
+use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\HomeController;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -46,7 +47,7 @@ class GenerateOpenApiSpec extends Command
                 'description' => implode("\n\n", [
                     'Läs-API för Next.js-frontenden. Alla anrop ligger under `/api/v1/{site}` där `{site}` är sajtens slug; bara aktiva sajter svarar (annars 404).',
                     'Bara publicerat innehåll i sajtens kommuner returneras – aldrig utkast, arkiverat, raderat, väntande revisioner eller väntande media.',
-                    'Språk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. Slugs är alltid den kanoniska för valt språk.',
+                    'Språk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. `slug` är alltid den kanoniska för valt språk; detaljresurserna (`businesses/{slug}`, `events/{slug}`, `articles/{slug}`, `pages/{slug}`) ger dessutom `slugs` med kanonisk slug per språk, för hreflang och språkväxling.',
                     '**301 utan Location-header.** Anropas en `{slug}`-resurs med en gammal slug, eller med sluggen för ett annat språk än det valda, svarar API:et `301` med `{"redirect_to": "<kanonisk slug>"}` i body och **ingen** `Location`-header. HTTP-klienter följer därför inte omdirigeringen själva (fetch returnerar 301-svaret som det är). Frontend bygger den kanoniska URL:en av `redirect_to` och svarar besökaren med en egen 301/308. Svaret har ingen ETag och cachas inte.',
                     'Alla lyckade svar har `ETag` och svarar 304 på matchande `If-None-Match`. Svaren cachas per sajt och typ på servern och töms när innehåll publiceras eller avpubliceras.',
                     "Tidpunkter returneras som ISO 8601 med offset i visningstidszonen `{$timezone}`, t.ex. `2026-11-03T19:00:00+01:00` (lagringen är UTC). Öppet just nu, dagens lunch, innevarande vecka och datumparametrarna `from`/`to` tolkas i samma tidszon.",
@@ -57,7 +58,7 @@ class GenerateOpenApiSpec extends Command
             ],
             'tags' => [
                 ['name' => 'Sajt'], ['name' => 'Startsida'], ['name' => 'Verksamheter'],
-                ['name' => 'Evenemang'], ['name' => 'Reportage'], ['name' => 'Sidor'], ['name' => 'Promotions'],
+                ['name' => 'Evenemang'], ['name' => 'Reportage'], ['name' => 'Sidor'], ['name' => 'Promotions'], ['name' => 'Kategorier'],
             ],
             'paths' => $this->paths(),
             'components' => [
@@ -126,7 +127,7 @@ class GenerateOpenApiSpec extends Command
                 'description' => 'Gammal eller annan-språkig slug ger 301 utan Location-header, se svaret 301.',
                 'operationId' => 'getEvent',
                 'parameters' => [$p('site'), $p('slug'), $p('locale')],
-                'responses' => ['200' => $this->item('Event', 'Evenemanget'), '301' => $r('Redirect')] + $common,
+                'responses' => ['200' => $this->item('EventDetail', 'Evenemanget'), '301' => $r('Redirect')] + $common,
             ]],
             '/{site}/articles' => ['get' => [
                 'tags' => ['Reportage'],
@@ -155,10 +156,18 @@ class GenerateOpenApiSpec extends Command
             '/{site}/promotions' => ['get' => [
                 'tags' => ['Promotions'],
                 'summary' => 'Aktiva placeringar',
-                'description' => 'Placeringar med status active vars tidsfönster omfattar nu, riktade mot sajtens kommuner och med publicerat innehåll. Högst prioritet först. `is_paid` betyder att en "Annons"-etikett ska visas; `link` pekar på innehållets kanoniska URL på dess hemsajt.',
+                'description' => 'Placeringar med status active vars tidsfönster omfattar nu, riktade mot sajtens kommuner och med publicerat innehåll. Högst prioritet först. `is_paid` betyder att en "Annons"-etikett ska visas; `link.path` är den sajtrelativa sökvägen till innehållets kanoniska sida, utan origin och språkprefix.',
                 'operationId' => 'listPromotions',
                 'parameters' => [$p('site'), $p('locale'), $p('placement')],
                 'responses' => ['200' => $this->collection('Promotion', 'Placeringar'), '422' => $r('ValidationError')] + $common,
+            ]],
+            '/{site}/categories' => ['get' => [
+                'tags' => ['Kategorier'],
+                'summary' => 'Kategorier med innehåll',
+                'description' => 'Kategorier som har publicerat innehåll på sajten: verksamhetskategorier med minst en lokalisering i katalogen, evenemangskategorier med minst ett kommande publicerat evenemang. Sorterade på typ och sorteringsordning. Utan `type` ges båda typerna.',
+                'operationId' => 'listCategories',
+                'parameters' => [$p('site'), $p('locale'), $p('type')],
+                'responses' => ['200' => $this->collection('Category', 'Kategorier'), '422' => $r('ValidationError')] + $common,
             ]],
         ];
     }
@@ -183,6 +192,7 @@ class GenerateOpenApiSpec extends Command
             'to' => $query('to', 'Visa evenemang som börjar senast denna tidpunkt. Ett rent datum gäller hela den dagen i visningstidszonen.', ['type' => 'string', 'format' => 'date-time']),
             'featured' => $query('featured', 'Sortera utvalda reportage först.', ['type' => 'boolean']),
             'placement' => $query('placement', 'Avgränsa till en yta.', ['type' => 'string', 'enum' => array_column(PromotionPlacement::cases(), 'value')]),
+            'type' => $query('type', 'Avgränsa till en kategorityp.', ['type' => 'string', 'enum' => array_column(CategoryController::TYPES, 'value')]),
         ];
     }
 
@@ -217,6 +227,7 @@ class GenerateOpenApiSpec extends Command
         ]);
 
         $locationLink = ['type' => ['object', 'null'], 'description' => 'Platsen i katalogen, om dess företag är publicerat.', 'properties' => ['slug' => $nullableString, 'namn' => $nullableString]];
+        $slugs = ['type' => 'object', 'description' => 'Kanonisk slug per språk – bara språk som har en. För hreflang och språkväxling.', 'additionalProperties' => $string, 'example' => ['sv' => 'stadshotellet', 'en' => 'town-hotel']];
 
         return [
             'Error' => $object(['message' => $string]),
@@ -268,6 +279,7 @@ class GenerateOpenApiSpec extends Command
             'BusinessLocationDetail' => ['allOf' => [
                 $this->ref('BusinessLocation'),
                 $object([
+                    'slugs' => $slugs,
                     'business' => $this->ref('Business'),
                     'opening_hours' => ['type' => 'array', 'description' => 'Måndag till söndag innevarande vecka.', 'items' => $this->ref('OpeningDay'), 'minItems' => 7, 'maxItems' => 7],
                     'lunch_menu' => ['oneOf' => [$this->ref('LunchMenu'), ['type' => 'null']]],
@@ -285,9 +297,10 @@ class GenerateOpenApiSpec extends Command
                 'id' => $id, 'slug' => $nullableString, 'titel' => $nullableString, 'ingress' => $nullableString, 'author_name' => $nullableString,
                 'featured' => ['type' => 'boolean'], 'published_at' => $dateTime, 'kommun' => $this->ref('Kommun'), 'images' => $list('Media'),
             ]),
-            'ArticleDetail' => ['allOf' => [$this->ref('Article'), $object(['body' => ['type' => ['string', 'null'], 'description' => 'HTML.']])]],
+            'EventDetail' => ['allOf' => [$this->ref('Event'), $object(['slugs' => $slugs])]],
+            'ArticleDetail' => ['allOf' => [$this->ref('Article'), $object(['slugs' => $slugs, 'body' => ['type' => ['string', 'null'], 'description' => 'HTML.']])]],
             'Page' => $object([
-                'id' => $id, 'slug' => $nullableString, 'titel' => $nullableString, 'body' => ['type' => ['string', 'null'], 'description' => 'HTML.'],
+                'id' => $id, 'slug' => $nullableString, 'slugs' => $slugs, 'titel' => $nullableString, 'body' => ['type' => ['string', 'null'], 'description' => 'HTML.'],
                 'published_at' => $dateTime, 'kommun' => ['oneOf' => [$this->ref('Kommun'), ['type' => 'null']], 'description' => 'null = nationell sida.'],
                 'images' => $list('Media'),
             ]),
@@ -297,11 +310,11 @@ class GenerateOpenApiSpec extends Command
                 'discount_value' => ['type' => ['number', 'null']], 'code' => $nullableString, 'starts_at' => $dateTime, 'ends_at' => $dateTime,
                 'business' => $this->ref('Business'),
             ]),
-            'Link' => ['type' => ['object', 'null'], 'description' => 'Innehållets kanoniska URL på dess hemsajt. null när innehållet saknar egen sida.', 'properties' => [
+            'Link' => ['type' => ['object', 'null'], 'description' => 'Sajtrelativ länk till innehållets kanoniska sida, utan origin och utan språkprefix – frontend lägger på båda. null när innehållet saknar egen sida.', 'properties' => [
                 'type' => ['type' => 'string', 'enum' => ['business_location', 'event', 'article', 'page']],
-                'slug' => $nullableString, 'locale' => $string, 'kommun' => $nullableString, 'site' => $nullableString,
-                'path' => ['type' => ['string', 'null'], 'example' => '/evenemang/nyhammarsfesten'],
-                'url' => ['type' => ['string', 'null'], 'format' => 'uri'],
+                'slug' => $nullableString, 'locale' => $string, 'kommun' => $nullableString,
+                'site' => ['type' => ['string', 'null'], 'description' => 'Innehållets hemsajt: aktiv sajt vars primärkommun är innehållets kommun, annars första aktiva sajt som visar kommunen.'],
+                'path' => ['type' => ['string', 'null'], 'description' => 'Sökvägssegment per typ plus kanonisk slug för valt språk.', 'example' => '/evenemang/nyhammarsfesten'],
             ]],
             'Promotion' => $object([
                 'id' => $id, 'placement' => ['type' => 'string', 'enum' => array_column(PromotionPlacement::cases(), 'value')], 'priority' => $id,

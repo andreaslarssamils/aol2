@@ -12,7 +12,7 @@ use Spatie\MediaLibrary\HasMedia;
 /**
  * Bas för API:ets resurser. Översättningsbara json-fält blir en sträng i vald locale
  * (ResolveLocale) med fallback till standardspråket, tidpunkter blir ISO 8601 med offset i
- * visningstidszonen, och bilder hämtas ur collection "images".
+ * visningstidszonen, bilder hämtas ur collection "images" och detaljsvar ger slugs per språk.
  */
 abstract class ApiResource extends JsonResource
 {
@@ -29,6 +29,12 @@ abstract class ApiResource extends JsonResource
         $text = $value[$this->locale($request)] ?? null;
 
         return filled($text) ? $text : ($value[static::defaultLocale()] ?? null);
+    }
+
+    /** Kanonisk slug per språk för detaljsvar – ett objekt även när det är tomt. */
+    protected function slugs(): object
+    {
+        return (object) $this->resource->canonicalSlugs();
     }
 
     protected function images(HasMedia $model): AnonymousResourceCollection

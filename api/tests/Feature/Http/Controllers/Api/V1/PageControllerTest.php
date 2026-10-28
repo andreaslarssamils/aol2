@@ -18,6 +18,7 @@ it('prefers the kommun page over the national one with the same slug', function 
         ->assertOk()
         ->assertJsonPath('data.id', $local->id)
         ->assertJsonPath('data.titel', 'Om Allt om Ludvika')
+        ->assertJsonPath('data.slugs', ['sv' => 'om-oss'])
         ->assertJsonPath('data.kommun.id', $site->primary_kommun_id);
     $this->getJson("/api/v1/{$otherSite->slug}/pages/om-oss")
         ->assertOk()

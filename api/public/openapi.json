@@ -3,7 +3,7 @@
     "info": {
         "title": "Allt om – publikt läs-API",
         "version": "1.0.0",
-        "description": "Läs-API för Next.js-frontenden. Alla anrop ligger under `/api/v1/{site}` där `{site}` är sajtens slug; bara aktiva sajter svarar (annars 404).\n\nBara publicerat innehåll i sajtens kommuner returneras – aldrig utkast, arkiverat, raderat, väntande revisioner eller väntande media.\n\nSpråk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. Slugs är alltid den kanoniska för valt språk.\n\n**301 utan Location-header.** Anropas en `{slug}`-resurs med en gammal slug, eller med sluggen för ett annat språk än det valda, svarar API:et `301` med `{\"redirect_to\": \"<kanonisk slug>\"}` i body och **ingen** `Location`-header. HTTP-klienter följer därför inte omdirigeringen själva (fetch returnerar 301-svaret som det är). Frontend bygger den kanoniska URL:en av `redirect_to` och svarar besökaren med en egen 301/308. Svaret har ingen ETag och cachas inte.\n\nAlla lyckade svar har `ETag` och svarar 304 på matchande `If-None-Match`. Svaren cachas per sajt och typ på servern och töms när innehåll publiceras eller avpubliceras.\n\nTidpunkter returneras som ISO 8601 med offset i visningstidszonen `Europe/Stockholm`, t.ex. `2026-11-03T19:00:00+01:00` (lagringen är UTC). Öppet just nu, dagens lunch, innevarande vecka och datumparametrarna `from`/`to` tolkas i samma tidszon."
+        "description": "Läs-API för Next.js-frontenden. Alla anrop ligger under `/api/v1/{site}` där `{site}` är sajtens slug; bara aktiva sajter svarar (annars 404).\n\nBara publicerat innehåll i sajtens kommuner returneras – aldrig utkast, arkiverat, raderat, väntande revisioner eller väntande media.\n\nSpråk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. `slug` är alltid den kanoniska för valt språk; detaljresurserna (`businesses/{slug}`, `events/{slug}`, `articles/{slug}`, `pages/{slug}`) ger dessutom `slugs` med kanonisk slug per språk, för hreflang och språkväxling.\n\n**301 utan Location-header.** Anropas en `{slug}`-resurs med en gammal slug, eller med sluggen för ett annat språk än det valda, svarar API:et `301` med `{\"redirect_to\": \"<kanonisk slug>\"}` i body och **ingen** `Location`-header. HTTP-klienter följer därför inte omdirigeringen själva (fetch returnerar 301-svaret som det är). Frontend bygger den kanoniska URL:en av `redirect_to` och svarar besökaren med en egen 301/308. Svaret har ingen ETag och cachas inte.\n\nAlla lyckade svar har `ETag` och svarar 304 på matchande `If-None-Match`. Svaren cachas per sajt och typ på servern och töms när innehåll publiceras eller avpubliceras.\n\nTidpunkter returneras som ISO 8601 med offset i visningstidszonen `Europe/Stockholm`, t.ex. `2026-11-03T19:00:00+01:00` (lagringen är UTC). Öppet just nu, dagens lunch, innevarande vecka och datumparametrarna `from`/`to` tolkas i samma tidszon."
     },
     "servers": [
         {
@@ -32,6 +32,9 @@
         },
         {
             "name": "Promotions"
+        },
+        {
+            "name": "Kategorier"
         }
     ],
     "paths": {
@@ -347,7 +350,7 @@
                                     ],
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/Event"
+                                            "$ref": "#/components/schemas/EventDetail"
                                         }
                                     }
                                 }
@@ -539,7 +542,7 @@
                     "Promotions"
                 ],
                 "summary": "Aktiva placeringar",
-                "description": "Placeringar med status active vars tidsfönster omfattar nu, riktade mot sajtens kommuner och med publicerat innehåll. Högst prioritet först. `is_paid` betyder att en \"Annons\"-etikett ska visas; `link` pekar på innehållets kanoniska URL på dess hemsajt.",
+                "description": "Placeringar med status active vars tidsfönster omfattar nu, riktade mot sajtens kommuner och med publicerat innehåll. Högst prioritet först. `is_paid` betyder att en \"Annons\"-etikett ska visas; `link.path` är den sajtrelativa sökvägen till innehållets kanoniska sida, utan origin och språkprefix.",
                 "operationId": "listPromotions",
                 "parameters": [
                     {
@@ -567,6 +570,59 @@
                                             "type": "array",
                                             "items": {
                                                 "$ref": "#/components/schemas/Promotion"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "304": {
+                        "$ref": "#/components/responses/NotModified"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/{site}/categories": {
+            "get": {
+                "tags": [
+                    "Kategorier"
+                ],
+                "summary": "Kategorier med innehåll",
+                "description": "Kategorier som har publicerat innehåll på sajten: verksamhetskategorier med minst en lokalisering i katalogen, evenemangskategorier med minst ett kommande publicerat evenemang. Sorterade på typ och sorteringsordning. Utan `type` ges båda typerna.",
+                "operationId": "listCategories",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/site"
+                    },
+                    {
+                        "$ref": "#/components/parameters/locale"
+                    },
+                    {
+                        "$ref": "#/components/parameters/type"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Kategorier",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Category"
                                             }
                                         }
                                     }
@@ -713,6 +769,19 @@
                         "kategorisida",
                         "evenemangskalender",
                         "nyhetsbrev"
+                    ]
+                }
+            },
+            "type": {
+                "name": "type",
+                "in": "query",
+                "required": false,
+                "description": "Avgränsa till en kategorityp.",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "business",
+                        "event"
                     ]
                 }
             }
@@ -1325,6 +1394,17 @@
                     {
                         "type": "object",
                         "properties": {
+                            "slugs": {
+                                "type": "object",
+                                "description": "Kanonisk slug per språk – bara språk som har en. För hreflang och språkväxling.",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "example": {
+                                    "sv": "stadshotellet",
+                                    "en": "town-hotel"
+                                }
+                            },
                             "business": {
                                 "$ref": "#/components/schemas/Business"
                             },
@@ -1355,6 +1435,7 @@
                             }
                         },
                         "required": [
+                            "slugs",
                             "business",
                             "opening_hours",
                             "lunch_menu",
@@ -1565,6 +1646,32 @@
                     "images"
                 ]
             },
+            "EventDetail": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Event"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "slugs": {
+                                "type": "object",
+                                "description": "Kanonisk slug per språk – bara språk som har en. För hreflang och språkväxling.",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "example": {
+                                    "sv": "stadshotellet",
+                                    "en": "town-hotel"
+                                }
+                            }
+                        },
+                        "required": [
+                            "slugs"
+                        ]
+                    }
+                ]
+            },
             "ArticleDetail": {
                 "allOf": [
                     {
@@ -1573,6 +1680,17 @@
                     {
                         "type": "object",
                         "properties": {
+                            "slugs": {
+                                "type": "object",
+                                "description": "Kanonisk slug per språk – bara språk som har en. För hreflang och språkväxling.",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "example": {
+                                    "sv": "stadshotellet",
+                                    "en": "town-hotel"
+                                }
+                            },
                             "body": {
                                 "type": [
                                     "string",
@@ -1582,6 +1700,7 @@
                             }
                         },
                         "required": [
+                            "slugs",
                             "body"
                         ]
                     }
@@ -1598,6 +1717,17 @@
                             "string",
                             "null"
                         ]
+                    },
+                    "slugs": {
+                        "type": "object",
+                        "description": "Kanonisk slug per språk – bara språk som har en. För hreflang och språkväxling.",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "example": {
+                            "sv": "stadshotellet",
+                            "en": "town-hotel"
+                        }
                     },
                     "titel": {
                         "type": [
@@ -1641,6 +1771,7 @@
                 "required": [
                     "id",
                     "slug",
+                    "slugs",
                     "titel",
                     "body",
                     "published_at",
@@ -1727,7 +1858,7 @@
                     "object",
                     "null"
                 ],
-                "description": "Innehållets kanoniska URL på dess hemsajt. null när innehållet saknar egen sida.",
+                "description": "Sajtrelativ länk till innehållets kanoniska sida, utan origin och utan språkprefix – frontend lägger på båda. null när innehållet saknar egen sida.",
                 "properties": {
                     "type": {
                         "type": "string",
@@ -1757,21 +1888,16 @@
                         "type": [
                             "string",
                             "null"
-                        ]
+                        ],
+                        "description": "Innehållets hemsajt: aktiv sajt vars primärkommun är innehållets kommun, annars första aktiva sajt som visar kommunen."
                     },
                     "path": {
                         "type": [
                             "string",
                             "null"
                         ],
+                        "description": "Sökvägssegment per typ plus kanonisk slug för valt språk.",
                         "example": "/evenemang/nyhammarsfesten"
-                    },
-                    "url": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "uri"
                     }
                 }
             },

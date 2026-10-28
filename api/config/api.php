@@ -31,17 +31,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Kanoniska frontend-URL:er
+    | Kanoniska frontend-sökvägar
     |--------------------------------------------------------------------------
     |
-    | Promotions länkar till innehållets kanoniska sida på dess hemsajt: sajtens domän
-    | om den har en, annars frontend-URL:en + sajtens slug. Sökvägssegment per typ
-    | (morph-alias) – håll dem i takt med Next.js-routerna.
+    | Promotions länkar till innehållets kanoniska sida som sajtrelativ sökväg, utan origin
+    | och språkprefix. Sökvägssegment per typ (morph-alias) – håll dem i takt med
+    | Next.js-routerna i web/.
     |
     */
 
     'frontend' => [
-        'url' => env('FRONTEND_URL', 'http://localhost:3000'),
         'paths' => [
             'business_location' => 'foretag',
             'event' => 'evenemang',

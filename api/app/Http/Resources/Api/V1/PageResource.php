@@ -6,7 +6,7 @@ use App\Models\Page;
 use Illuminate\Http\Request;
 
 /**
- * Statisk sida. kommun är null för nationella sidor.
+ * Statisk sida med kanonisk slug per språk. kommun är null för nationella sidor.
  *
  * @mixin Page
  */
@@ -18,6 +18,7 @@ class PageResource extends ApiResource
         return [
             'id' => $this->id,
             'slug' => $this->localizedSlug($this->locale($request)),
+            'slugs' => $this->slugs(),
             'titel' => $this->translate($this->titel, $request),
             'body' => $this->translate($this->body, $request),
             'published_at' => $this->dateTime($this->published_at),

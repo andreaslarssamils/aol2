@@ -113,6 +113,7 @@ it('shows a location with this week\'s hours, the current lunch menu, images and
     $business->addMedia(UploadedFile::fake()->image('vantande.jpg', 10, 10))->toMediaCollection(Business::MEDIA_PENDING);
     $location = BusinessLocation::factory()->for($business)->create(['kommun_id' => $site->primary_kommun_id]);
     $location->setSlug('sv', 'stadshotellet');
+    $location->setSlug('en', 'town-hotel');
     OpeningHour::factory()->for($location)->create(['weekday' => 0, 'opens' => '18:00', 'closes' => '22:00']);
     OpeningHour::factory()->for($location)->create(['weekday' => 0, 'opens' => '09:00', 'closes' => '17:00']);
     OpeningHourException::factory()->for($location)->create(['date' => '2026-11-06', 'note' => 'Semesterstängt']);
@@ -128,6 +129,7 @@ it('shows a location with this week\'s hours, the current lunch menu, images and
 
     expect($response->json('data.namn'))->toBe('Stadshotellet')
         ->and($response->json('data.slug'))->toBe('stadshotellet')
+        ->and($response->json('data.slugs'))->toBe(['sv' => 'stadshotellet', 'en' => 'town-hotel'])
         ->and($response->json('data.business.beskrivning'))->toBe('Hotell och krog')
         ->and($response->json('data.opening_hours'))->toHaveCount(7)
         ->and($response->json('data.opening_hours.0'))->toEqual([

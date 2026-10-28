@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\ArticleController;
 use App\Http\Controllers\Api\V1\BusinessLocationController;
+use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\EventController;
 use App\Http\Controllers\Api\V1\HomeController;
 use App\Http\Controllers\Api\V1\PageController;
@@ -70,4 +71,8 @@ Route::prefix('v1/{site}')
         Route::get('promotions', PromotionController::class)
             ->middleware(CacheApiResponse::for(ApiCache::PROMOTIONS))
             ->name('promotions.index');
+
+        Route::get('categories', CategoryController::class)
+            ->middleware(CacheApiResponse::for(ApiCache::CATEGORIES))
+            ->name('categories.index');
     });

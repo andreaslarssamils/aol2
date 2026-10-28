@@ -50,7 +50,7 @@ it('filters on a date range and category', function () {
         ->assertJsonValidationErrors('from');
 });
 
-it('shows an event with kommun, categories and venue, and redirects old slugs with 301', function () {
+it('shows an event with kommun, categories, venue and canonical slugs per locale, and redirects old slugs with 301', function () {
     $site = Site::factory()->active()->create();
     $kommun = $site->primary_kommun_id;
     $location = BusinessLocation::factory()->for(Business::factory()->published()->create(['namn' => 'Stadshotellet']))->create(['kommun_id' => $kommun]);
@@ -63,11 +63,13 @@ it('shows an event with kommun, categories and venue, and redirects old slugs wi
     ]);
     $event->categories()->attach(Category::factory()->event()->create(['slug' => 'musik', 'namn' => ['sv' => 'Musik', 'en' => 'Music']]));
     $event->setSlug('sv', 'pubquiz-tisdagar');
+    $event->setSlug('en', 'pub-quiz-tuesdays');
 
     $this->getJson("/api/v1/{$site->slug}/events/pubquiz-tisdagar")
         ->assertOk()
         ->assertJsonPath('data.namn', 'Pubquiz')
         ->assertJsonPath('data.slug', 'pubquiz-tisdagar')
+        ->assertJsonPath('data.slugs', ['sv' => 'pubquiz-tisdagar', 'en' => 'pub-quiz-tuesdays'])
         ->assertJsonPath('data.starts_at', '2026-11-03T19:00:00+01:00')
         ->assertJsonPath('data.ends_at', '2026-11-03T21:00:00+01:00')
         ->assertJsonPath('data.kommun.id', $kommun)

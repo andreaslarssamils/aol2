@@ -44,10 +44,12 @@ class ApiCache
 
     public const string PROMOTIONS = 'promotions';
 
+    public const string CATEGORIES = 'categories';
+
     /** @var list<string> */
     public const array TYPES = [
         self::SITE, self::HOME, self::BUSINESSES, self::EVENTS,
-        self::ARTICLES, self::PAGES, self::PROMOTIONS,
+        self::ARTICLES, self::PAGES, self::PROMOTIONS, self::CATEGORIES,
     ];
 
     /**
@@ -57,16 +59,16 @@ class ApiCache
      */
     protected const array DEPENDENTS = [
         Article::class => [self::ARTICLES, self::HOME, self::PROMOTIONS],
-        Event::class => [self::EVENTS, self::HOME, self::PROMOTIONS, self::BUSINESSES],
+        Event::class => [self::EVENTS, self::HOME, self::PROMOTIONS, self::BUSINESSES, self::CATEGORIES],
         Page::class => [self::PAGES],
-        Business::class => [self::BUSINESSES, self::HOME, self::PROMOTIONS, self::EVENTS],
-        BusinessLocation::class => [self::BUSINESSES, self::HOME, self::PROMOTIONS, self::EVENTS],
+        Business::class => [self::BUSINESSES, self::HOME, self::PROMOTIONS, self::EVENTS, self::CATEGORIES],
+        BusinessLocation::class => [self::BUSINESSES, self::HOME, self::PROMOTIONS, self::EVENTS, self::CATEGORIES],
         LunchMenu::class => [self::BUSINESSES, self::HOME],
         Offer::class => [self::PROMOTIONS, self::HOME],
         OpeningHour::class => [self::BUSINESSES, self::HOME, self::PROMOTIONS],
         OpeningHourException::class => [self::BUSINESSES, self::HOME, self::PROMOTIONS],
         Promotion::class => [self::PROMOTIONS, self::HOME],
-        Category::class => [self::BUSINESSES, self::EVENTS, self::HOME, self::PROMOTIONS],
+        Category::class => [self::BUSINESSES, self::EVENTS, self::HOME, self::PROMOTIONS, self::CATEGORIES],
     ];
 
     public function store(): Repository

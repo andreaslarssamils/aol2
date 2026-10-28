@@ -55,6 +55,26 @@ trait HasSlugs
     }
 
     /**
+     * Kanonisk slug per språk i config('app.locales')-ordning – bara språk som har en. Det
+     * detaljsvaren ger för hreflang och språkväxling. Går via slugs-relationen (ladda den).
+     *
+     * @return array<string, string>
+     */
+    public function canonicalSlugs(): array
+    {
+        $canonical = $this->slugs->where('is_canonical', true)->pluck('slug', 'locale');
+        $slugs = [];
+
+        foreach (array_keys(config('app.locales')) as $locale) {
+            if ($canonical->has($locale)) {
+                $slugs[$locale] = $canonical[$locale];
+            }
+        }
+
+        return $slugs;
+    }
+
+    /**
      * Gör $slug (eller "$slug-2", "$slug-3" ... om den är upptagen av annat innehåll)
      * till kanonisk för $locale. Tidigare kanonisk slug blir icke-kanonisk (301), och en
      * egen gammal slug som återanvänds befordras i stället för att dubbleras.

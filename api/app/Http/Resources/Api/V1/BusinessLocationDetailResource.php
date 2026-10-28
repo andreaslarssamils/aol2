@@ -9,8 +9,8 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 
 /**
- * Detaljsidan: listraden plus hela företaget, veckans öppettider (avvikelser inräknade),
- * aktuell lunchmeny och kommande evenemang på platsen.
+ * Detaljsidan: listraden plus kanonisk slug per språk, hela företaget, veckans öppettider
+ * (avvikelser inräknade), aktuell lunchmeny och kommande evenemang på platsen.
  *
  * @mixin BusinessLocation
  */
@@ -21,6 +21,7 @@ class BusinessLocationDetailResource extends BusinessLocationResource
     {
         return [
             ...parent::toArray($request),
+            'slugs' => $this->slugs(),
             'business' => BusinessResource::make($this->business),
             'opening_hours' => $this->openingHoursThisWeek(),
             'lunch_menu' => $this->whenLoaded('currentLunchMenu', fn (LunchMenu $menu) => LunchMenuResource::make($menu)),

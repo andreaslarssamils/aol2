@@ -22,5 +22,8 @@ it('writes a spec that documents every public API route', function () {
     expect($spec['openapi'])->toStartWith('3.1')
         ->and(array_keys($spec['paths']))->toEqualCanonicalizing($routes)
         ->and($spec['paths']['/{site}/businesses/{slug}']['get']['responses'])->toHaveKeys(['200', '301', '304', '404'])
-        ->and($spec['components']['parameters']['locale']['schema']['enum'])->toBe(array_keys(config('app.locales')));
+        ->and($spec['components']['parameters']['locale']['schema']['enum'])->toBe(array_keys(config('app.locales')))
+        ->and($spec['components']['parameters']['type']['schema']['enum'])->toBe(['business', 'event'])
+        ->and($spec['components']['schemas']['Link']['properties'])->not->toHaveKey('url')
+        ->and($spec['components']['schemas']['EventDetail']['allOf'][1]['properties'])->toHaveKey('slugs');
 });

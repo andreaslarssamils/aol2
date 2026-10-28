@@ -11,15 +11,16 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Kanonisk länk till innehåll som lyfts fram via promotions. Hemsajt = aktiv sajt vars
- * primärkommun är innehållets kommun, annars första aktiva sajt som visar kommunen.
- * Sökvägen per typ bor i config('api.frontend.paths'). Erbjudanden har ingen egen sida
- * och länkar till företagets primära lokalisering, om den finns i katalogen.
+ * Sajtrelativ länk till innehåll som lyfts fram via promotions: sökvägssegmentet per typ
+ * (config('api.frontend.paths')) plus kanonisk slug för valt språk – utan origin och utan
+ * språkprefix, frontend lägger på båda. Hemsajt = aktiv sajt vars primärkommun är innehållets
+ * kommun, annars första aktiva sajt som visar kommunen. Erbjudanden har ingen egen sida och
+ * länkar till företagets primära lokalisering, om den finns i katalogen.
  */
 class ContentUrl
 {
     /**
-     * @return array{type: string, slug: ?string, locale: string, kommun: ?string, site: ?string, path: ?string, url: ?string}|null
+     * @return array{type: string, slug: ?string, locale: string, kommun: ?string, site: ?string, path: ?string}|null
      */
     public function for(?Model $content, string $locale): ?array
     {
@@ -47,7 +48,6 @@ class ContentUrl
             'kommun' => $kommun?->slug,
             'site' => $site?->slug,
             'path' => $path,
-            'url' => $site === null || $path === null ? null : $this->baseUrl($site).$path,
         ];
     }
 
@@ -59,14 +59,5 @@ class ContentUrl
             ->orderByRaw('(primary_kommun_id = ?) DESC', [$kommun->id])
             ->orderBy('id')
             ->first();
-    }
-
-    protected function baseUrl(Site $site): string
-    {
-        if ($site->domain !== null) {
-            return 'https://'.$site->domain;
-        }
-
-        return rtrim((string) config('api.frontend.url'), '/').'/'.$site->slug;
     }
 }

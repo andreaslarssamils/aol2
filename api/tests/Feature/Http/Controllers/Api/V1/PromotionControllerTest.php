@@ -13,7 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('lists active promotions with paid flag, content and canonical link, highest priority first', function () {
+it('lists active promotions with paid flag, content and a site-relative link, highest priority first', function () {
     $this->freezeTime();
     $site = Site::factory()->active()->create();
     $kommun = $site->primary_kommun_id;
@@ -43,12 +43,11 @@ it('lists active promotions with paid flag, content and canonical link, highest 
             'kommun' => 'ludvika',
             'site' => 'ludvika',
             'path' => '/evenemang/nyhammarsfesten',
-            'url' => 'http://localhost:3000/ludvika/evenemang/nyhammarsfesten',
         ])
         ->and($this->getJson("/api/v1/{$site->slug}/promotions")->json('data.*.id'))->toBe([$paid->id, $free->id, $newsletter->id]);
 });
 
-it('uses the site domain in links and sends offers to the business primary location', function () {
+it('sends offers to the business primary location and never includes an origin in the link', function () {
     $site = Site::factory()->active()->create();
     $ludvika = Kommun::factory()->create(['slug' => 'ludvika']);
     Site::factory()->active()->create(['slug' => 'ludvika', 'domain' => 'alltomludvika.se', 'primary_kommun_id' => $ludvika]);
@@ -65,7 +64,9 @@ it('uses the site domain in links and sends offers to the business primary locat
         ->assertJsonPath('data.0.content.titel', '20 % på allt')
         ->assertJsonPath('data.0.content.business.namn', 'Acme AB')
         ->assertJsonPath('data.0.link.type', 'business_location')
-        ->assertJsonPath('data.0.link.url', 'https://alltomludvika.se/foretag/acme');
+        ->assertJsonPath('data.0.link.path', '/foretag/acme')
+        ->assertJsonPath('data.0.link.site', 'ludvika')
+        ->assertJsonMissingPath('data.0.link.url');
 });
 
 it('rejects an unknown placement with 422', function () {

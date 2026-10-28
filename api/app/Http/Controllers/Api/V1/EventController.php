@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\CategoryType;
+use App\Http\Resources\Api\V1\EventDetailResource;
 use App\Http\Resources\Api\V1\EventResource;
 use App\Models\Event;
 use Carbon\CarbonInterface;
@@ -47,7 +48,7 @@ class EventController extends ApiController
         return EventResource::collection($events);
     }
 
-    public function show(Request $request, string $site, string $slug): EventResource|JsonResponse
+    public function show(Request $request, string $site, string $slug): EventDetailResource|JsonResponse
     {
         $event = $this->findBySlug(
             $this->publishedEvents($request)->with(['kommun', 'categories', 'businessLocation.business', 'slugs', 'media']),
@@ -55,7 +56,7 @@ class EventController extends ApiController
             $request,
         );
 
-        return $event instanceof JsonResponse ? $event : EventResource::make($event);
+        return $event instanceof JsonResponse ? $event : EventDetailResource::make($event);
     }
 
     /** @return Builder<Event> */

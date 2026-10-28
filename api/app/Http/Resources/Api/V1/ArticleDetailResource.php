@@ -13,6 +13,7 @@ class ArticleDetailResource extends ArticleResource
     {
         return [
             ...parent::toArray($request),
+            'slugs' => $this->slugs(),
             'body' => $this->translate($this->body, $request),
         ];
     }

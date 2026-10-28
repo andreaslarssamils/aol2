@@ -32,7 +32,7 @@ it('puts featured articles first when asked', function () {
         ->and($this->getJson("/api/v1/{$site->slug}/articles?featured=1")->json('data.*.id'))->toBe([$featuredOld->id, $plainNew->id]);
 });
 
-it('shows an article with its body and redirects old slugs with 301', function () {
+it('shows an article with its body and canonical slugs per locale, and redirects old slugs with 301', function () {
     $site = Site::factory()->active()->create();
     $article = Article::factory()->published()->create([
         'kommun_id' => $site->primary_kommun_id,
@@ -41,10 +41,13 @@ it('shows an article with its body and redirects old slugs with 301', function (
         'author_name' => 'Anna Andersson',
     ]);
     $article->setSlug('sv', 'midsommar-2026');
+    $article->setSlug('en', 'midsummer-2026');
 
     $this->getJson("/api/v1/{$site->slug}/articles/midsommar-2026")
         ->assertOk()
         ->assertJsonPath('data.titel', 'Midsommar i Ludvika')
+        ->assertJsonPath('data.slug', 'midsommar-2026')
+        ->assertJsonPath('data.slugs', ['sv' => 'midsommar-2026', 'en' => 'midsummer-2026'])
         ->assertJsonPath('data.body', '<p>Dans kring stången.</p>')
         ->assertJsonPath('data.author_name', 'Anna Andersson');
     $this->getJson("/api/v1/{$site->slug}/articles/midsommar-i-ludvika")
