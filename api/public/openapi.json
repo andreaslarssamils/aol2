@@ -3,7 +3,7 @@
     "info": {
         "title": "Allt om – publikt läs-API",
         "version": "1.0.0",
-        "description": "Läs-API för Next.js-frontenden. Alla anrop ligger under `/api/v1/{site}` där `{site}` är sajtens slug; bara aktiva sajter svarar (annars 404).\n\nBara publicerat innehåll i sajtens kommuner returneras – aldrig utkast, arkiverat, raderat, väntande revisioner eller väntande media.\n\nSpråk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. Slugs är alltid den kanoniska för valt språk.\n\n**301 utan Location-header.** Anropas en `{slug}`-resurs med en gammal slug, eller med sluggen för ett annat språk än det valda, svarar API:et `301` med `{\"redirect_to\": \"<kanonisk slug>\"}` i body och **ingen** `Location`-header. HTTP-klienter följer därför inte omdirigeringen själva (fetch returnerar 301-svaret som det är). Frontend bygger den kanoniska URL:en av `redirect_to` och svarar besökaren med en egen 301/308. Svaret har ingen ETag och cachas inte.\n\nAlla lyckade svar har `ETag` och svarar 304 på matchande `If-None-Match`. Svaren cachas per sajt och typ på servern och töms när innehåll publiceras eller avpubliceras.\n\nTidsstämplar är ISO 8601 med UTC-offset. Öppettider, dagens lunch, innevarande vecka och datumparametrar tolkas i appens tidszon (`Europe/Stockholm`)."
+        "description": "Läs-API för Next.js-frontenden. Alla anrop ligger under `/api/v1/{site}` där `{site}` är sajtens slug; bara aktiva sajter svarar (annars 404).\n\nBara publicerat innehåll i sajtens kommuner returneras – aldrig utkast, arkiverat, raderat, väntande revisioner eller väntande media.\n\nSpråk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. Slugs är alltid den kanoniska för valt språk.\n\n**301 utan Location-header.** Anropas en `{slug}`-resurs med en gammal slug, eller med sluggen för ett annat språk än det valda, svarar API:et `301` med `{\"redirect_to\": \"<kanonisk slug>\"}` i body och **ingen** `Location`-header. HTTP-klienter följer därför inte omdirigeringen själva (fetch returnerar 301-svaret som det är). Frontend bygger den kanoniska URL:en av `redirect_to` och svarar besökaren med en egen 301/308. Svaret har ingen ETag och cachas inte.\n\nAlla lyckade svar har `ETag` och svarar 304 på matchande `If-None-Match`. Svaren cachas per sajt och typ på servern och töms när innehåll publiceras eller avpubliceras.\n\nTidpunkter returneras som ISO 8601 med offset i visningstidszonen `Europe/Stockholm`, t.ex. `2026-11-03T19:00:00+01:00` (lagringen är UTC). Öppet just nu, dagens lunch, innevarande vecka och datumparametrarna `from`/`to` tolkas i samma tidszon."
     },
     "servers": [
         {
@@ -676,7 +676,7 @@
                 "name": "from",
                 "in": "query",
                 "required": false,
-                "description": "Visa evenemang som pågår eller börjar från och med denna tidpunkt (datum eller ISO 8601, ett rent datum tolkas i appens tidszon). Standard: nu.",
+                "description": "Visa evenemang som pågår eller börjar från och med denna tidpunkt: ett datum (tolkas i visningstidszonen) eller ISO 8601 med offset. Standard: nu.",
                 "schema": {
                     "type": "string",
                     "format": "date-time"
@@ -686,7 +686,7 @@
                 "name": "to",
                 "in": "query",
                 "required": false,
-                "description": "Visa evenemang som börjar senast denna tidpunkt. Ett rent datum gäller hela dagen.",
+                "description": "Visa evenemang som börjar senast denna tidpunkt. Ett rent datum gäller hela den dagen i visningstidszonen.",
                 "schema": {
                     "type": "string",
                     "format": "date-time"
@@ -1180,7 +1180,7 @@
                     },
                     "open_now": {
                         "type": "boolean",
-                        "description": "Öppet just nu enligt öppettider och avvikelser, i appens tidszon."
+                        "description": "Öppet just nu enligt öppettider och avvikelser, i visningstidszonen."
                     },
                     "images": {
                         "type": "array",
@@ -1290,7 +1290,7 @@
                         "items": {
                             "type": "string"
                         },
-                        "description": "Dagens rätter, i appens tidszon."
+                        "description": "Dagens rätter, i visningstidszonen."
                     },
                     "location": {
                         "type": "object",
@@ -1389,14 +1389,16 @@
                     },
                     "starts_at": {
                         "type": "string",
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T19:00:00+01:00"
                     },
                     "ends_at": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T21:00:00+01:00"
                     },
                     "venue_name": {
                         "type": [
@@ -1439,7 +1441,8 @@
                             "string",
                             "null"
                         ],
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T21:00:00+01:00"
                     },
                     "kommun": {
                         "$ref": "#/components/schemas/Kommun"
@@ -1537,7 +1540,8 @@
                             "string",
                             "null"
                         ],
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T21:00:00+01:00"
                     },
                     "kommun": {
                         "$ref": "#/components/schemas/Kommun"
@@ -1613,7 +1617,8 @@
                             "string",
                             "null"
                         ],
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T21:00:00+01:00"
                     },
                     "kommun": {
                         "oneOf": [
@@ -1690,14 +1695,16 @@
                             "string",
                             "null"
                         ],
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T21:00:00+01:00"
                     },
                     "ends_at": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T21:00:00+01:00"
                     },
                     "business": {
                         "$ref": "#/components/schemas/Business"
@@ -1792,14 +1799,16 @@
                     },
                     "starts_at": {
                         "type": "string",
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T19:00:00+01:00"
                     },
                     "ends_at": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "format": "date-time"
+                        "format": "date-time",
+                        "example": "2026-11-03T21:00:00+01:00"
                     },
                     "type": {
                         "type": "string",

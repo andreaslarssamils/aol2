@@ -217,3 +217,31 @@ it('hides draft locations from the list and answers 404 for them', function () {
     $this->getJson("/api/v1/{$site->slug}/businesses/{$draft->slugFor('sv')}")->assertNotFound();
     $this->getJson("/api/v1/{$site->slug}/businesses/{$published->slugFor('sv')}")->assertOk();
 });
+
+it('evaluates open-now in the display timezone across the switch to daylight saving time', function () {
+    // Sista söndagen i mars 2027 hoppar klockan 02:00 → 03:00. "02:30 svensk tid" finns inte, så PHP
+    // flyttar den till 03:30 CEST = 01:30 UTC. now() är UTC – klockslaget måste räknas i visningstidszonen.
+    $this->travelTo(Carbon::parse('2027-03-28 02:30', 'Europe/Stockholm'));
+
+    expect(now()->toIso8601String())->toBe('2027-03-28T01:30:00+00:00');
+
+    $site = Site::factory()->active()->create();
+    $kommun = $site->primary_kommun_id;
+    $location = fn (string $namn): BusinessLocation => BusinessLocation::factory()
+        ->for(Business::factory()->published()->create(['namn' => $namn]))
+        ->create(['kommun_id' => $kommun]);
+
+    OpeningHour::factory()->for($location('Sondag 03-06'))->create(['weekday' => 6, 'opens' => '03:00', 'closes' => '06:00']);
+    OpeningHour::factory()->for($location('Lordagsnatt till 04'))->create(['weekday' => 5, 'opens' => '22:00', 'closes' => '04:00']);
+    OpeningHour::factory()->for($location('Lordagsnatt till 03'))->create(['weekday' => 5, 'opens' => '22:00', 'closes' => '03:00']);
+    OpeningHour::factory()->for($location('Sondag 01-02, oppet bara i UTC'))->create(['weekday' => 6, 'opens' => '01:00', 'closes' => '02:00']);
+
+    $response = $this->getJson("/api/v1/{$site->slug}/businesses")->assertOk();
+
+    expect(collect($response->json('data'))->pluck('open_now', 'namn')->all())->toEqual([
+        'Sondag 03-06' => true,
+        'Lordagsnatt till 04' => true,
+        'Lordagsnatt till 03' => false,
+        'Sondag 01-02, oppet bara i UTC' => false,
+    ]);
+});

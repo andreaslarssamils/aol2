@@ -25,7 +25,7 @@ class BusinessLocationController extends ApiController
             'q' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
-        $today = now();
+        $today = now()->setTimezone(config('app.display_timezone'));
 
         $locations = $this->publishedLocations($request)
             ->when($validated['category'] ?? null, fn (Builder $query, string $category) => $query
@@ -61,7 +61,7 @@ class BusinessLocationController extends ApiController
             return $location;
         }
 
-        $monday = now()->startOfWeek(CarbonInterface::MONDAY);
+        $monday = now()->setTimezone(config('app.display_timezone'))->startOfWeek(CarbonInterface::MONDAY);
 
         $location->load([
             'business.categories', 'business.media', 'kommun', 'slugs', 'openingHours',

@@ -111,3 +111,13 @@ it('knows whether it is open at a given time, including intervals past midnight'
         ->and($location->isOpenAt(Carbon::parse('2026-11-07 01:30', 'Europe/Stockholm')))->toBeTrue() // efternatt mot lördag
         ->and($location->isOpenAt(Carbon::parse('2026-11-07 02:30', 'Europe/Stockholm')))->toBeFalse();
 });
+
+it('resolves the day for opening hours in the display timezone', function () {
+    $location = BusinessLocation::factory()->create();
+    OpeningHour::factory()->for($location)->create(['weekday' => 0, 'opens' => '09:00', 'closes' => '17:00']);
+    OpeningHour::factory()->for($location)->create(['weekday' => 1, 'opens' => '10:00', 'closes' => '18:00']);
+
+    // 23:30 UTC måndag 2026-11-02 är 00:30 tisdag i Sverige.
+    expect($location->hoursOn(Carbon::parse('2026-11-02 23:30', 'UTC'))->first()->opens)->toBe('10:00:00')
+        ->and($location->hoursOn(Carbon::parse('2026-11-02 12:00', 'UTC'))->first()->opens)->toBe('09:00:00');
+});

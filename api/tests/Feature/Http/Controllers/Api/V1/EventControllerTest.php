@@ -54,7 +54,13 @@ it('shows an event with kommun, categories and venue, and redirects old slugs wi
     $site = Site::factory()->active()->create();
     $kommun = $site->primary_kommun_id;
     $location = BusinessLocation::factory()->for(Business::factory()->published()->create(['namn' => 'Stadshotellet']))->create(['kommun_id' => $kommun]);
-    $event = Event::factory()->published()->create(['kommun_id' => $kommun, 'business_location_id' => $location, 'namn' => 'Pubquiz']);
+    $event = Event::factory()->published()->create([
+        'kommun_id' => $kommun,
+        'business_location_id' => $location,
+        'namn' => 'Pubquiz',
+        'starts_at' => '2026-11-03 18:00:00', // UTC i databasen
+        'ends_at' => '2026-11-03 20:00:00',
+    ]);
     $event->categories()->attach(Category::factory()->event()->create(['slug' => 'musik', 'namn' => ['sv' => 'Musik', 'en' => 'Music']]));
     $event->setSlug('sv', 'pubquiz-tisdagar');
 
@@ -62,6 +68,8 @@ it('shows an event with kommun, categories and venue, and redirects old slugs wi
         ->assertOk()
         ->assertJsonPath('data.namn', 'Pubquiz')
         ->assertJsonPath('data.slug', 'pubquiz-tisdagar')
+        ->assertJsonPath('data.starts_at', '2026-11-03T19:00:00+01:00')
+        ->assertJsonPath('data.ends_at', '2026-11-03T21:00:00+01:00')
         ->assertJsonPath('data.kommun.id', $kommun)
         ->assertJsonPath('data.categories.0.namn', 'Musik')
         ->assertJsonPath('data.location', ['slug' => $location->slugFor('sv'), 'namn' => 'Stadshotellet']);

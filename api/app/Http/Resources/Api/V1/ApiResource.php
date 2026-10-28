@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Models\Business;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -10,7 +11,8 @@ use Spatie\MediaLibrary\HasMedia;
 
 /**
  * Bas för API:ets resurser. Översättningsbara json-fält blir en sträng i vald locale
- * (ResolveLocale) med fallback till standardspråket, och bilder hämtas ur collection "images".
+ * (ResolveLocale) med fallback till standardspråket, tidpunkter blir ISO 8601 med offset i
+ * visningstidszonen, och bilder hämtas ur collection "images".
  */
 abstract class ApiResource extends JsonResource
 {
@@ -32,6 +34,12 @@ abstract class ApiResource extends JsonResource
     protected function images(HasMedia $model): AnonymousResourceCollection
     {
         return MediaResource::collection($model->getMedia(Business::MEDIA_IMAGES));
+    }
+
+    /** Tidpunkt som ISO 8601 med offset i visningstidszonen, t.ex. 2026-11-03T19:00:00+01:00. Lagringen är UTC. */
+    protected function dateTime(?CarbonInterface $value): ?string
+    {
+        return $value?->copy()->setTimezone(config('app.display_timezone'))->toIso8601String();
     }
 
     protected function coordinate(mixed $value): ?float

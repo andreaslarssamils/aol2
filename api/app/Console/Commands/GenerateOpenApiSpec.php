@@ -36,7 +36,7 @@ class GenerateOpenApiSpec extends Command
     /** @return array<string, mixed> */
     public function spec(): array
     {
-        $timezone = config('app.timezone');
+        $timezone = config('app.display_timezone');
 
         return [
             'openapi' => '3.1.0',
@@ -49,7 +49,7 @@ class GenerateOpenApiSpec extends Command
                     'Språk väljs med `?locale=` eller `Accept-Language` (bara språk i `app.locales`, standard `sv`). Översättningsbara fält returneras som en sträng i valt språk med fallback till svenska. Slugs är alltid den kanoniska för valt språk.',
                     '**301 utan Location-header.** Anropas en `{slug}`-resurs med en gammal slug, eller med sluggen för ett annat språk än det valda, svarar API:et `301` med `{"redirect_to": "<kanonisk slug>"}` i body och **ingen** `Location`-header. HTTP-klienter följer därför inte omdirigeringen själva (fetch returnerar 301-svaret som det är). Frontend bygger den kanoniska URL:en av `redirect_to` och svarar besökaren med en egen 301/308. Svaret har ingen ETag och cachas inte.',
                     'Alla lyckade svar har `ETag` och svarar 304 på matchande `If-None-Match`. Svaren cachas per sajt och typ på servern och töms när innehåll publiceras eller avpubliceras.',
-                    "Tidsstämplar är ISO 8601 med UTC-offset. Öppettider, dagens lunch, innevarande vecka och datumparametrar tolkas i appens tidszon (`{$timezone}`).",
+                    "Tidpunkter returneras som ISO 8601 med offset i visningstidszonen `{$timezone}`, t.ex. `2026-11-03T19:00:00+01:00` (lagringen är UTC). Öppet just nu, dagens lunch, innevarande vecka och datumparametrarna `from`/`to` tolkas i samma tidszon.",
                 ]),
             ],
             'servers' => [
@@ -179,8 +179,8 @@ class GenerateOpenApiSpec extends Command
             'category' => $query('category', 'Kategorislug (type business).', ['type' => 'string']),
             'eventCategory' => $query('category', 'Kategorislug (type event).', ['type' => 'string']),
             'q' => $query('q', 'Fritextsök på lokaliseringens namn, ort och företagets namn.', ['type' => 'string']),
-            'from' => $query('from', 'Visa evenemang som pågår eller börjar från och med denna tidpunkt (datum eller ISO 8601, ett rent datum tolkas i appens tidszon). Standard: nu.', ['type' => 'string', 'format' => 'date-time']),
-            'to' => $query('to', 'Visa evenemang som börjar senast denna tidpunkt. Ett rent datum gäller hela dagen.', ['type' => 'string', 'format' => 'date-time']),
+            'from' => $query('from', 'Visa evenemang som pågår eller börjar från och med denna tidpunkt: ett datum (tolkas i visningstidszonen) eller ISO 8601 med offset. Standard: nu.', ['type' => 'string', 'format' => 'date-time']),
+            'to' => $query('to', 'Visa evenemang som börjar senast denna tidpunkt. Ett rent datum gäller hela den dagen i visningstidszonen.', ['type' => 'string', 'format' => 'date-time']),
             'featured' => $query('featured', 'Sortera utvalda reportage först.', ['type' => 'boolean']),
             'placement' => $query('placement', 'Avgränsa till en yta.', ['type' => 'string', 'enum' => array_column(PromotionPlacement::cases(), 'value')]),
         ];
@@ -206,7 +206,7 @@ class GenerateOpenApiSpec extends Command
     {
         $string = ['type' => 'string'];
         $nullableString = ['type' => ['string', 'null']];
-        $dateTime = ['type' => ['string', 'null'], 'format' => 'date-time'];
+        $dateTime = ['type' => ['string', 'null'], 'format' => 'date-time', 'example' => '2026-11-03T21:00:00+01:00'];
         $coordinate = ['type' => ['number', 'null']];
         $id = ['type' => 'integer'];
         $list = fn (string $schema): array => ['type' => 'array', 'items' => $this->ref($schema)];
@@ -250,7 +250,7 @@ class GenerateOpenApiSpec extends Command
                 'business' => $this->ref('BusinessSummary'), 'categories' => $list('Category'),
                 'adress' => $nullableString, 'postnummer' => $nullableString, 'ort' => $nullableString, 'telefon' => $nullableString,
                 'lat' => $coordinate, 'lng' => $coordinate, 'is_primary' => ['type' => 'boolean'], 'kommun' => $this->ref('Kommun'),
-                'open_now' => ['type' => 'boolean', 'description' => 'Öppet just nu enligt öppettider och avvikelser, i appens tidszon.'],
+                'open_now' => ['type' => 'boolean', 'description' => 'Öppet just nu enligt öppettider och avvikelser, i visningstidszonen.'],
                 'images' => $list('Media'),
             ]),
             'OpeningInterval' => $object(['opens' => ['type' => 'string', 'example' => '09:00'], 'closes' => ['type' => 'string', 'example' => '17:00']]),
@@ -262,7 +262,7 @@ class GenerateOpenApiSpec extends Command
             'LunchMenu' => $object([
                 'iso_year' => $id, 'week' => $id,
                 'menu' => ['type' => 'object', 'description' => '{"mon": [...], ..., "sun": [...]}', 'additionalProperties' => ['type' => 'array', 'items' => $string]],
-                'today' => ['type' => 'array', 'items' => $string, 'description' => 'Dagens rätter, i appens tidszon.'],
+                'today' => ['type' => 'array', 'items' => $string, 'description' => 'Dagens rätter, i visningstidszonen.'],
                 'location' => ['type' => 'object', 'properties' => ['slug' => $nullableString, 'namn' => $nullableString]],
             ], ['iso_year', 'week', 'menu', 'today']),
             'BusinessLocationDetail' => ['allOf' => [
@@ -276,7 +276,7 @@ class GenerateOpenApiSpec extends Command
             ]],
             'Event' => $object([
                 'id' => $id, 'slug' => $nullableString, 'namn' => $string, 'beskrivning' => $nullableString, 'all_day' => ['type' => 'boolean'],
-                'starts_at' => ['type' => 'string', 'format' => 'date-time'], 'ends_at' => $dateTime,
+                'starts_at' => ['type' => 'string', 'format' => 'date-time', 'example' => '2026-11-03T19:00:00+01:00'], 'ends_at' => $dateTime,
                 'venue_name' => $nullableString, 'adress' => $nullableString, 'lat' => $coordinate, 'lng' => $coordinate,
                 'pris' => $nullableString, 'ticket_url' => $nullableString, 'published_at' => $dateTime,
                 'kommun' => $this->ref('Kommun'), 'categories' => $list('Category'), 'location' => $locationLink, 'images' => $list('Media'),
@@ -306,7 +306,7 @@ class GenerateOpenApiSpec extends Command
             'Promotion' => $object([
                 'id' => $id, 'placement' => ['type' => 'string', 'enum' => array_column(PromotionPlacement::cases(), 'value')], 'priority' => $id,
                 'is_paid' => ['type' => 'boolean', 'description' => 'true → visa "Annons"-etikett.'],
-                'starts_at' => ['type' => 'string', 'format' => 'date-time'], 'ends_at' => $dateTime,
+                'starts_at' => ['type' => 'string', 'format' => 'date-time', 'example' => '2026-11-03T19:00:00+01:00'], 'ends_at' => $dateTime,
                 'type' => ['type' => 'string', 'enum' => ['business_location', 'event', 'article', 'offer']],
                 'content' => ['oneOf' => [$this->ref('Event'), $this->ref('Article'), $this->ref('BusinessLocation'), $this->ref('Offer')]],
                 'link' => $this->ref('Link'),

@@ -20,7 +20,7 @@ class PageResource extends ApiResource
             'slug' => $this->localizedSlug($this->locale($request)),
             'titel' => $this->translate($this->titel, $request),
             'body' => $this->translate($this->body, $request),
-            'published_at' => $this->published_at,
+            'published_at' => $this->dateTime($this->published_at),
             'kommun' => $this->kommun === null ? null : KommunResource::make($this->kommun),
             'images' => $this->images($this->resource),
         ];

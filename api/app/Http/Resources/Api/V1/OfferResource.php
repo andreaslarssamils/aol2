@@ -18,8 +18,8 @@ class OfferResource extends ApiResource
             'discount_type' => $this->discount_type?->value,
             'discount_value' => $this->discount_value === null ? null : (float) $this->discount_value,
             'code' => $this->code,
-            'starts_at' => $this->starts_at,
-            'ends_at' => $this->ends_at,
+            'starts_at' => $this->dateTime($this->starts_at),
+            'ends_at' => $this->dateTime($this->ends_at),
             'business' => BusinessResource::make($this->whenLoaded('business')),
         ];
     }

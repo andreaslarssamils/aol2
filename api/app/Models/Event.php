@@ -84,13 +84,13 @@ class Event extends Model implements HasMedia
         $query->whereNull($query->qualifyColumn('recurrence_rule'));
     }
 
-    /** Pågående eller kommande: slutar (eller börjar, om sluttid saknas) vid eller efter $at. Jämförs i appens tidszon, som tiderna lagras i. */
+    /** Pågående eller kommande: slutar (eller börjar, om sluttid saknas) vid eller efter $at. Lagringen är UTC, så jämförelsen görs i UTC. */
     #[Scope]
     protected function upcoming(Builder $query, CarbonInterface $at): void
     {
         $query->whereRaw(
             "COALESCE({$query->qualifyColumn('ends_at')}, {$query->qualifyColumn('starts_at')}) >= ?",
-            [$at->copy()->setTimezone(config('app.timezone'))->toDateTimeString()],
+            [$at->copy()->utc()->toDateTimeString()],
         );
     }
 

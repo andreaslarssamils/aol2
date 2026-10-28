@@ -62,10 +62,12 @@ class LunchMenu extends Model
         return $this->businessLocation?->kommun;
     }
 
-    /** Menyn för datumets ISO-vecka – vecka 1 kan börja i december, därför iso_year. */
+    /** Menyn för datumets ISO-vecka i visningstidszonen – vecka 1 kan börja i december, därför iso_year. */
     #[Scope]
     protected function forIsoWeek(Builder $query, CarbonInterface $date): void
     {
+        $date = $date->copy()->setTimezone(config('app.display_timezone'));
+
         $query->where('iso_year', $date->isoWeekYear)->where('week', $date->isoWeek);
     }
 

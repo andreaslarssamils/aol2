@@ -33,7 +33,7 @@ class EventController extends ApiController
         $events = $this->publishedEvents($request)
             ->upcoming($from)
             ->when($to, fn (Builder $query, CarbonInterface $to) => $query
-                ->where('starts_at', '<=', $to->copy()->setTimezone(config('app.timezone'))->toDateTimeString()))
+                ->where('starts_at', '<=', $to->copy()->utc()->toDateTimeString()))
             ->when($validated['category'] ?? null, fn (Builder $query, string $category) => $query
                 ->whereHas('categories', fn (Builder $categories) => $categories
                     ->where('categories.slug', $category)
@@ -67,14 +67,17 @@ class EventController extends ApiController
             ->withoutRecurrenceTemplates();
     }
 
-    /** Datum eller tidpunkt i appens tidszon (ISO 8601 med offset respekteras). Ett rent datum som slutgräns gäller hela den dagen. */
+    /**
+     * Datum eller tidpunkt i visningstidszonen (en ISO 8601-sträng med egen offset respekteras).
+     * Ett rent datum som slutgräns gäller hela den dagen. Jämförelsen mot lagringen görs i UTC.
+     */
     protected function parseDate(?string $value, bool $endOfDay = false): ?Carbon
     {
         if ($value === null) {
             return null;
         }
 
-        $date = Carbon::parse($value, config('app.timezone'));
+        $date = Carbon::parse($value, config('app.display_timezone'));
 
         return $endOfDay && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $date->endOfDay() : $date;
     }

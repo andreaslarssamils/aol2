@@ -40,8 +40,8 @@ class PromotionResource extends ApiResource
             'placement' => $this->placement->value,
             'priority' => $this->priority,
             'is_paid' => $this->is_paid,
-            'starts_at' => $this->starts_at,
-            'ends_at' => $this->ends_at,
+            'starts_at' => $this->dateTime($this->starts_at),
+            'ends_at' => $this->dateTime($this->ends_at),
             'type' => $this->promotable_type,
             'content' => match (true) {
                 $promotable instanceof Event => EventResource::make($promotable),

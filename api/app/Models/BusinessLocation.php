@@ -92,14 +92,17 @@ class BusinessLocation extends Model
     }
 
     /**
-     * Öppettider ett visst datum. En avvikelse vinner alltid över ordinarie tider. Är relationerna
-     * laddade används de (ladda då rader som täcker datumet), annars frågas databasen.
+     * Öppettider ett visst datum. Tidpunkten tolkas i visningstidszonen (app.display_timezone) –
+     * 23:30 UTC är redan nästa dag i Sverige. En avvikelse vinner alltid över ordinarie tider.
+     * Är relationerna laddade används de (ladda då rader som täcker datumet), annars frågas databasen.
      */
     public function hoursOn(CarbonInterface $date): Collection
     {
+        $date = self::inDisplayTimezone($date);
+
         $exceptions = $this->relationLoaded('openingHourExceptions')
-            ? $this->openingHourExceptions->filter(fn (OpeningHourException $exception): bool => $exception->date->isSameDay($date))->sortBy('opens')->values()
-            : $this->openingHourExceptions()->whereDate('date', $date)->orderBy('opens')->get();
+            ? $this->openingHourExceptions->filter(fn (OpeningHourException $exception): bool => $exception->date->toDateString() === $date->toDateString())->sortBy('opens')->values()
+            : $this->openingHourExceptions()->whereDate('date', $date->toDateString())->orderBy('opens')->get();
 
         if ($exceptions->isNotEmpty()) {
             return $exceptions;
@@ -112,9 +115,13 @@ class BusinessLocation extends Model
             : $this->openingHours()->where('weekday', $weekday)->get();
     }
 
-    /** Öppet vid tidpunkten? Intervall över midnatt (22–02) räknas även in på efternatten. */
+    /**
+     * Öppet vid tidpunkten? Klockslaget räknas i visningstidszonen, så sommartid sköts av
+     * tidszonen. Intervall över midnatt (22–02) räknas även in på efternatten.
+     */
     public function isOpenAt(CarbonInterface $at): bool
     {
+        $at = self::inDisplayTimezone($at);
         $time = $at->format('H:i');
 
         foreach ($this->hoursOn($at) as $hours) {
@@ -138,6 +145,12 @@ class BusinessLocation extends Model
         }
 
         return false;
+    }
+
+    /** Samma ögonblick uttryckt i visningstidszonen, utan att röra originalet. */
+    protected static function inDisplayTimezone(CarbonInterface $at): CarbonInterface
+    {
+        return $at->copy()->setTimezone(config('app.display_timezone'));
     }
 
     /** @return array{?string, ?string} Öppnar/stänger som "HH:MM", eller [null, null] när raden betyder stängt. */
@@ -175,7 +188,7 @@ class BusinessLocation extends Model
         return $this->hasMany(LunchMenu::class);
     }
 
-    /** Publicerad lunchmeny för innevarande ISO-vecka (appens tidszon). */
+    /** Publicerad lunchmeny för innevarande ISO-vecka i visningstidszonen. */
     public function currentLunchMenu(): HasOne
     {
         return $this->hasOne(LunchMenu::class)->published()->forIsoWeek(now());

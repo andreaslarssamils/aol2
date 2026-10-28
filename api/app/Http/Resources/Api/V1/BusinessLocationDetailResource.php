@@ -29,13 +29,13 @@ class BusinessLocationDetailResource extends BusinessLocationResource
     }
 
     /**
-     * Måndag till söndag innevarande vecka. En avvikelse ersätter ordinarie tider för sin dag.
+     * Måndag till söndag innevarande vecka i visningstidszonen. En avvikelse ersätter ordinarie tider för sin dag.
      *
      * @return list<array{date: string, weekday: int, closed: bool, is_exception: bool, note: ?string, intervals: list<array{opens: string, closes: string}>}>
      */
     protected function openingHoursThisWeek(): array
     {
-        $monday = now()->startOfWeek(CarbonInterface::MONDAY);
+        $monday = now()->setTimezone(config('app.display_timezone'))->startOfWeek(CarbonInterface::MONDAY);
         $week = [];
 
         for ($weekday = 0; $weekday < 7; $weekday++) {

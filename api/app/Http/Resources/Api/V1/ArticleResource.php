@@ -22,7 +22,7 @@ class ArticleResource extends ApiResource
             'ingress' => $this->translate($this->ingress, $request),
             'author_name' => $this->author_name,
             'featured' => $this->featured,
-            'published_at' => $this->published_at,
+            'published_at' => $this->dateTime($this->published_at),
             'kommun' => KommunResource::make($this->whenLoaded('kommun')),
             'images' => $this->images($this->resource),
         ];

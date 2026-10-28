@@ -7,7 +7,7 @@ use App\Models\LunchMenu;
 use Illuminate\Http\Request;
 
 /**
- * Veckans lunch: hela menyn ({"mon": [...], ...}) plus dagens rätter (appens tidszon).
+ * Veckans lunch: hela menyn ({"mon": [...], ...}) plus dagens rätter i visningstidszonen.
  *
  * @mixin LunchMenu
  */
@@ -30,9 +30,9 @@ class LunchMenuResource extends ApiResource
         ];
     }
 
-    /** Nyckeln för dagens rätter: mon, tue ... sun. */
+    /** Nyckeln för dagens rätter i visningstidszonen: mon, tue ... sun. */
     public static function todayKey(): string
     {
-        return strtolower(now()->format('D'));
+        return strtolower(now()->setTimezone(config('app.display_timezone'))->format('D'));
     }
 }
