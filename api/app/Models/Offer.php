@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SanitizedHtml;
 use App\Enums\ContentStatus;
 use App\Enums\DiscountType;
 use App\Http\Requests\OfferRequest;
@@ -39,7 +40,7 @@ class Offer extends Model
     {
         return [
             'titel' => 'array',
-            'beskrivning' => 'array',
+            'beskrivning' => SanitizedHtml::class,
             'discount_type' => DiscountType::class,
             'discount_value' => 'decimal:2',
             'starts_at' => 'datetime',

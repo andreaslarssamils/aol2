@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SanitizedHtml;
 use App\Enums\ContentStatus;
 use App\Http\Requests\PageRequest;
 use App\Models\Concerns\HasContentStatus;
@@ -40,7 +41,7 @@ class Page extends Model implements HasMedia
     {
         return [
             'titel' => 'array',
-            'body' => 'array',
+            'body' => SanitizedHtml::class,
             'status' => ContentStatus::class,
             'published_at' => 'datetime',
         ];

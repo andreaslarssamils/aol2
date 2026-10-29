@@ -2,9 +2,11 @@
 
 namespace App\Actions\Revisions;
 
+use App\Casts\SanitizedHtml;
 use App\Models\BusinessLocation;
 use App\Models\Revision;
 use App\Models\User;
+use App\Support\HtmlSanitizer;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -20,13 +22,16 @@ use Illuminate\Validation\ValidationException;
  * Ägarlänkar skyddas: på en befintlig rad strippas de ur payloaden oavsett vem som skickar in,
  * och nytt innehåll får bara skapas under en verksamhet inskickaren är kopplad till.
  * Admin och redaktör är undantagna från båda reglerna.
+ *
+ * Rich text saneras före valideringen (App\Support\HtmlSanitizer): editorial-profilen för
+ * redaktionen, den snävare owner-profilen för alla andra.
  */
 class SubmitRevision
 {
     /** Fält som avgör vem innehållet tillhör – ändras aldrig via en revision på en befintlig rad. */
     public const array OWNERSHIP_FIELDS = ['business_id', 'business_location_id', 'author_id', 'created_by', 'parent_event_id'];
 
-    public function __construct(private ApproveRevision $approveRevision) {}
+    public function __construct(private ApproveRevision $approveRevision, private HtmlSanitizer $sanitizer) {}
 
     /**
      * @param  Model  $model  Innehåll som använder HasRevisions. Finns raden inte skapas den som utkast.
@@ -41,6 +46,7 @@ class SubmitRevision
             $payload = Arr::except($payload, self::OWNERSHIP_FIELDS);
         }
 
+        $payload = $this->sanitize($model, $payload, $user);
         $payload = $this->validate($model, $payload);
 
         if (! $user->isEditorial() && ! $model->exists) {
@@ -61,6 +67,26 @@ class SubmitRevision
         }
 
         return $revision;
+    }
+
+    /**
+     * Rich text-kolumnerna (de med casten SanitizedHtml) saneras innan valideringen, så att det
+     * som valideras är det som sparas. Payloaden i kön är därmed ren även om den aldrig godkänns.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function sanitize(Model $model, array $payload, User $user): array
+    {
+        $profile = $user->isEditorial() ? HtmlSanitizer::EDITORIAL : HtmlSanitizer::OWNER;
+
+        foreach (SanitizedHtml::columns($model) as $column) {
+            if (array_key_exists($column, $payload)) {
+                $payload[$column] = $this->sanitizer->sanitizeValue($payload[$column], $profile);
+            }
+        }
+
+        return $payload;
     }
 
     /**

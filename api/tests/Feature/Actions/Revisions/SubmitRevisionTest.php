@@ -15,6 +15,7 @@ use App\Models\Offer;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
@@ -278,4 +279,57 @@ it('keeps a new location out of the published scope until its revision is approv
         ->and($location->published_at)->toEqual(now())
         ->and(BusinessLocation::published()->whereKey($location)->exists())->toBeTrue()
         ->and(BusinessLocation::inCatalog()->whereKey($location)->exists())->toBeTrue();
+});
+
+it('sanitizes rich text in the payload with the owner profile before it reaches the queue', function () {
+    $business = Business::factory()->create();
+    $owner = User::factory()->verksamhetsagare()->create();
+    $image = Storage::disk(config('media-library.disk_name'))->url('1/bild.jpg');
+
+    $revision = app(SubmitRevision::class)->handle($business, [
+        'namn' => 'Bageri & Café',
+        'beskrivning' => [
+            'sv' => "<h2>Rubrik</h2><p onclick=\"x()\">Hej <a href=\"https://example.com/sida\">där</a></p><img src=\"{$image}\"><script>alert(1)</script>",
+            'en' => '<p>Hello</p>',
+        ],
+    ], $owner);
+
+    expect($revision->payload['beskrivning'])->toBe([
+        'sv' => 'Rubrik<p>Hej <a href="https://example.com/sida" rel="noopener nofollow">där</a></p>',
+        'en' => '<p>Hello</p>',
+    ])->and($revision->payload['namn'])->toBe('Bageri & Café'); // ren text saneras inte – den escapas vid rendering
+});
+
+it('lets the editorial team keep inline images and h2 headings', function () {
+    $article = Article::factory()->create();
+    $editor = User::factory()->redaktor()->create();
+    $image = Storage::disk(config('media-library.disk_name'))->url('1/bild.jpg');
+
+    $revision = app(SubmitRevision::class)->handle($article, [
+        'kommun_id' => $article->kommun_id,
+        'titel' => ['sv' => 'Titel', 'en' => 'Title'],
+        'body' => [
+            'sv' => "<h2>Rubrik</h2><p>Hej</p><img src=\"{$image}\" alt=\"Bild\"><img src=\"https://evil.test/x.png\"><script>alert(1)</script>",
+            'en' => '<p>Hello</p>',
+        ],
+    ], $editor);
+
+    expect($revision->payload['body']['sv'])->toBe("<h2>Rubrik</h2><p>Hej</p><img src=\"{$image}\" alt=\"Bild\">");
+});
+
+it('validates the sanitized value, so stripped markup does not count toward length limits', function () {
+    $owner = User::factory()->verksamhetsagare()->create();
+    $location = BusinessLocation::factory()->create();
+    $location->business->addUser($owner);
+    $dish = str_repeat('a', 250);
+
+    $revision = app(SubmitRevision::class)->handle(new LunchMenu, [
+        'business_location_id' => $location->id,
+        'iso_year' => 2026,
+        'week' => 44,
+        'menu' => ['mon' => [$dish.'<script>alert(1)</script>']],
+    ], $owner);
+
+    expect($revision->payload['menu'])->toBe(['mon' => [$dish]])
+        ->and($revision->revisionable->menu)->toBe(['mon' => [$dish]]);
 });

@@ -11,6 +11,7 @@ use App\Models\Offer;
 use App\Models\Page;
 use App\Models\User;
 use App\Observers\ApiCacheObserver;
+use App\Support\HtmlSanitizer;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -22,7 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // En sanerare per request: Symfony-konfigen byggs en gång och sajternas domäner läses en gång.
+        $this->app->scoped(HtmlSanitizer::class);
     }
 
     /**

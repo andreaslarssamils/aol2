@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SanitizedHtml;
 use App\Enums\ContentStatus;
 use App\Http\Requests\EventRequest;
 use App\Models\Concerns\HasContentStatus;
@@ -49,7 +50,7 @@ class Event extends Model implements HasMedia
     protected function casts(): array
     {
         return [
-            'beskrivning' => 'array',
+            'beskrivning' => SanitizedHtml::class,
             'all_day' => 'boolean',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',

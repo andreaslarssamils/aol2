@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\SanitizedHtml;
 use App\Enums\BusinessKind;
 use App\Enums\BusinessUserRole;
 use App\Enums\ContentStatus;
@@ -57,7 +58,7 @@ class Business extends Model implements HasMedia
             'kind' => BusinessKind::class,
             'managed_by' => ManagedBy::class,
             'auto_approve' => 'boolean',
-            'beskrivning' => 'array',
+            'beskrivning' => SanitizedHtml::class,
             'status' => ContentStatus::class,
             'published_at' => 'datetime',
         ];
