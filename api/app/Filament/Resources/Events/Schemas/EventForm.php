@@ -6,6 +6,7 @@ use App\Enums\CategoryType;
 use App\Filament\Forms\Components\ContentStatusSelect;
 use App\Filament\Forms\Components\ImagesUpload;
 use App\Filament\Forms\Components\KommunSelect;
+use App\Filament\Forms\Components\RichText;
 use App\Filament\Forms\Components\SlugInput;
 use App\Filament\Infolists\Components\SlugHistoryEntry;
 use App\Filament\Resources\Categories\Schemas\CategoryForm;
@@ -13,7 +14,6 @@ use App\Filament\Schemas\Components\LocaleTabs;
 use App\Models\BusinessLocation;
 use App\Models\Category;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -111,7 +111,7 @@ class EventForm
                         SlugInput::forLocale($locale)
                             ->fallbackTo('namn'),
                         SlugHistoryEntry::forLocale($locale),
-                        RichEditor::make("beskrivning.{$locale}")
+                        RichText::make("beskrivning.{$locale}")
                             ->label('Beskrivning'),
                     ]),
                 Section::make('Publicering')

@@ -333,3 +333,18 @@ it('validates the sanitized value, so stripped markup does not count toward leng
     expect($revision->payload['menu'])->toBe(['mon' => [$dish]])
         ->and($revision->revisionable->menu)->toBe(['mon' => [$dish]]);
 });
+
+it('reduces plain text columns to text for everyone, including the editorial team', function () {
+    $article = Article::factory()->create();
+    $editor = User::factory()->redaktor()->create();
+
+    $revision = app(SubmitRevision::class)->handle($article, [
+        'kommun_id' => $article->kommun_id,
+        'titel' => ['sv' => 'Titel', 'en' => 'Title'],
+        'ingress' => ['sv' => '<p>Fisk &amp; chips <script>alert(1)</script><b>deluxe</b></p>', 'en' => 'Fish &amp; chips'],
+        'body' => ['sv' => '<p>Fisk &amp; chips</p>', 'en' => ''],
+    ], $editor);
+
+    expect($revision->payload['ingress'])->toBe(['sv' => 'Fisk & chips deluxe', 'en' => 'Fish & chips'])
+        ->and($revision->payload['body'])->toBe(['sv' => '<p>Fisk &amp; chips</p>', 'en' => '']);
+});

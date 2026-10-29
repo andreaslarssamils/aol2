@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\PlainText;
 use App\Casts\SanitizedHtml;
 use App\Enums\ContentStatus;
 use App\Http\Requests\ArticleRequest;
@@ -41,7 +42,7 @@ class Article extends Model implements HasMedia
     {
         return [
             'titel' => 'array',
-            'ingress' => SanitizedHtml::class,
+            'ingress' => PlainText::class,
             'body' => SanitizedHtml::class,
             'featured' => 'boolean',
             'status' => ContentStatus::class,

@@ -10,15 +10,19 @@ use Symfony\Component\HtmlSanitizer\HtmlSanitizerAction;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
 /**
- * Sanerar rich text innan den sparas – aldrig vid rendering. Körs av casten App\Casts\SanitizedHtml
- * på allt som skrivs till rich text-kolumnerna och av SubmitRevision på payloaden innan den
- * hamnar i kön. Resultatet är ett HTML-fragment som frontend renderar som det är.
+ * Sanerar innehåll innan det sparas – aldrig vid rendering. Körs av casterna i App\Casts
+ * (SanitizedHtml, PlainText) på allt som skrivs till kolumnerna och av SubmitRevision på
+ * payloaden innan den hamnar i kön.
  *
  * Profiler:
  *  - editorial: p, br, strong, em, u, s, h2, h3, h4, ul, ol, li, blockquote, a och img.
- *    Redaktionens rich editor; img bara med absolut URL på en egen mediadomän.
+ *    Redaktionens rich editor; img bara med absolut URL på en egen mediadomän. Resultatet är
+ *    ett HTML-fragment som frontend renderar som det är.
  *  - owner: samma utan img och h2 – ägare laddar upp bilder via media, inte inline.
  *    Allt som inte kommer från redaktionen.
+ *  - text: ren text. All markup strippas och entiteter avkodas, så "Fisk &amp; chips" lagras
+ *    som "Fisk & chips". För fält som visas som text (ingress, lunchrätter) – den som renderar
+ *    escapar själv.
  *
  * Allt annat strippas. Vanliga textbärande element utanför profilen (div, span, h1, b, table …)
  * tas bort men texten behålls; element vars innehåll inte är text (script, style, iframe, svg …)
@@ -32,6 +36,8 @@ class HtmlSanitizer
     public const string EDITORIAL = 'editorial';
 
     public const string OWNER = 'owner';
+
+    public const string TEXT = 'text';
 
     public const string EXTERNAL_LINK_REL = 'noopener nofollow';
 
@@ -50,14 +56,14 @@ class HtmlSanitizer
     ];
 
     /**
-     * Element utanför profilen som tas bort men vars text behålls – ofta inklistrat innehåll.
-     * Allt som varken är tillåtet eller står här tas bort med innehåll.
+     * Element som, liksom de i EDITORIAL_ELEMENTS, tas bort med texten kvar när profilen inte
+     * tillåter dem – ofta inklistrat innehåll. Allt annat tas bort med innehåll.
      *
      * @var list<string>
      */
     protected const array TEXT_BEARING_ELEMENTS = [
         'div', 'span', 'section', 'article', 'aside', 'header', 'footer', 'main', 'nav', 'figure', 'figcaption',
-        'h1', 'h2', 'h5', 'h6', 'pre', 'code', 'b', 'i', 'small', 'sub', 'sup', 'mark', 'ins', 'del', 'abbr',
+        'h1', 'h5', 'h6', 'pre', 'code', 'b', 'i', 'small', 'sub', 'sup', 'mark', 'ins', 'del', 'abbr',
         'cite', 'q', 'dfn', 'time', 'kbd', 'samp', 'var', 'address', 'font', 'center', 'label', 'details',
         'summary', 'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'dl', 'dt', 'dd',
     ];
@@ -83,7 +89,11 @@ class HtmlSanitizer
 
         $sanitized = $this->sanitizer($profile)->sanitize($html);
 
-        return $sanitized === '' ? '' : $this->postProcess($sanitized);
+        return match (true) {
+            $sanitized === '' => '',
+            $profile === self::TEXT => html_entity_decode($sanitized, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            default => $this->postProcess($sanitized),
+        };
     }
 
     /**
@@ -109,6 +119,7 @@ class HtmlSanitizer
         $elements = match ($profile) {
             self::EDITORIAL => self::EDITORIAL_ELEMENTS,
             self::OWNER => array_values(array_diff(self::EDITORIAL_ELEMENTS, self::OWNER_EXCLUDED_ELEMENTS)),
+            self::TEXT => [],
             default => throw new InvalidArgumentException("Okänd saneringsprofil \"{$profile}\"."),
         };
 
@@ -126,7 +137,7 @@ class HtmlSanitizer
             $config = $config->allowElement($element, self::ATTRIBUTES[$element] ?? []);
         }
 
-        foreach (array_diff(self::TEXT_BEARING_ELEMENTS, $elements) as $element) {
+        foreach (array_diff([...self::EDITORIAL_ELEMENTS, ...self::TEXT_BEARING_ELEMENTS], $elements) as $element) {
             $config = $config->blockElement($element);
         }
 

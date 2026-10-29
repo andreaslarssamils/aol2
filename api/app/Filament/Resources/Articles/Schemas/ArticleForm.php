@@ -5,11 +5,11 @@ namespace App\Filament\Resources\Articles\Schemas;
 use App\Filament\Forms\Components\ContentStatusSelect;
 use App\Filament\Forms\Components\ImagesUpload;
 use App\Filament\Forms\Components\KommunSelect;
+use App\Filament\Forms\Components\RichText;
 use App\Filament\Forms\Components\SlugInput;
 use App\Filament\Infolists\Components\SlugHistoryEntry;
 use App\Filament\Schemas\Components\LocaleTabs;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -55,7 +55,7 @@ class ArticleForm
                         Textarea::make("ingress.{$locale}")
                             ->label('Ingress')
                             ->rows(3),
-                        RichEditor::make("body.{$locale}")
+                        RichText::make("body.{$locale}")
                             ->label('Brödtext'),
                     ]),
                 Section::make('Publicering')

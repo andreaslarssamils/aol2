@@ -2,6 +2,7 @@
 
 namespace App\Actions\Revisions;
 
+use App\Casts\PlainText;
 use App\Casts\SanitizedHtml;
 use App\Models\BusinessLocation;
 use App\Models\Revision;
@@ -23,8 +24,9 @@ use Illuminate\Validation\ValidationException;
  * och nytt innehåll får bara skapas under en verksamhet inskickaren är kopplad till.
  * Admin och redaktör är undantagna från båda reglerna.
  *
- * Rich text saneras före valideringen (App\Support\HtmlSanitizer): editorial-profilen för
- * redaktionen, den snävare owner-profilen för alla andra.
+ * Innehållet saneras före valideringen (App\Support\HtmlSanitizer): rich text med
+ * editorial-profilen för redaktionen och den snävare owner-profilen för alla andra; rena
+ * textfält (ingress, lunchrätter) strippas från all markup oavsett roll.
  */
 class SubmitRevision
 {
@@ -70,17 +72,21 @@ class SubmitRevision
     }
 
     /**
-     * Rich text-kolumnerna (de med casten SanitizedHtml) saneras innan valideringen, så att det
-     * som valideras är det som sparas. Payloaden i kön är därmed ren även om den aldrig godkänns.
+     * Innehållet saneras innan valideringen, så att det som valideras är det som sparas och kön
+     * aldrig innehåller osanerat innehåll: rich text-kolumnerna (casten SanitizedHtml) med
+     * rollens profil, rena textkolumner (casten PlainText) strippas från all markup.
      *
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     protected function sanitize(Model $model, array $payload, User $user): array
     {
-        $profile = $user->isEditorial() ? HtmlSanitizer::EDITORIAL : HtmlSanitizer::OWNER;
+        $profiles = [
+            ...array_fill_keys(SanitizedHtml::columns($model), $user->isEditorial() ? HtmlSanitizer::EDITORIAL : HtmlSanitizer::OWNER),
+            ...array_fill_keys(PlainText::columns($model), HtmlSanitizer::TEXT),
+        ];
 
-        foreach (SanitizedHtml::columns($model) as $column) {
+        foreach ($profiles as $column => $profile) {
             if (array_key_exists($column, $payload)) {
                 $payload[$column] = $this->sanitizer->sanitizeValue($payload[$column], $profile);
             }

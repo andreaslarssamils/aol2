@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Casts\SanitizedHtml;
+use App\Casts\PlainText;
 use App\Enums\ContentStatus;
 use App\Http\Requests\LunchMenuRequest;
 use App\Models\Concerns\HasContentStatus;
@@ -37,7 +37,7 @@ class LunchMenu extends Model
         return [
             'iso_year' => 'integer',
             'week' => 'integer',
-            'menu' => SanitizedHtml::class,
+            'menu' => PlainText::class,
             'status' => ContentStatus::class,
             'published_at' => 'datetime',
         ];

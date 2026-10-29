@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ContentStatus;
+use App\Filament\Forms\Components\RichText;
 use App\Filament\Resources\Articles\ArticleResource;
 use App\Filament\Resources\Articles\Pages\CreateArticle;
 use App\Filament\Resources\Articles\Pages\EditArticle;
@@ -9,6 +10,7 @@ use App\Models\Article;
 use App\Models\Kommun;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -125,4 +127,30 @@ it('forbids users without an editorial role', function (User $user) {
 it('redirects guests to the login page', function () {
     $this->get(ArticleResource::getUrl('index'))
         ->assertRedirect();
+});
+
+it('keeps inline images from the public disk in the body', function () {
+    $this->actingAs(User::factory()->redaktor()->create());
+    $image = Storage::disk('public')->url('inline/bild.jpg');
+
+    Livewire::test(CreateArticle::class)
+        ->fillForm([
+            'kommun_id' => Kommun::factory()->create()->id,
+            'titel.sv' => 'Bildartikel',
+            'body.sv' => "<p>Hej</p><img src=\"{$image}\" alt=\"Bild\"><img src=\"https://evil.test/x.png\">",
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $body = Article::sole()->body['sv'];
+
+    expect($body)->toContain("<img src=\"{$image}\"")
+        ->and($body)->not->toContain('evil.test');
+});
+
+it('uploads inline images to the public disk under inline/', function () {
+    $editor = RichText::make('body.sv');
+
+    expect($editor->getFileAttachmentsDiskName())->toBe('public')
+        ->and($editor->getFileAttachmentsDirectory())->toBe('inline');
 });

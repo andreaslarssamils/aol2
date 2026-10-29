@@ -125,3 +125,22 @@ it('treats the app url, the media disk and the sites\' domains as own hosts', fu
         .'<img src="https://media.alltom.test/storage/1/bild.jpg"><img src="https://api.alltom.test/bild.jpg"></p>',
     );
 });
+
+it('reduces markup to plain text with decoded entities in the text profile', function () {
+    $html = '<p onclick="x()">Fisk &amp; chips <strong>deluxe</strong> för 10 &lt; 20 kr</p><script>alert(1)</script><style>p {}</style>'
+        .'<h2>Rubrik</h2><a href="https://example.com">länk</a><img src="https://media.alltom.test/1/bild.jpg">';
+
+    expect($this->sanitizer->sanitize($html, HtmlSanitizer::TEXT))->toBe('Fisk & chips deluxe för 10 < 20 krRubriklänk');
+});
+
+it('keeps plain text as typed in the text profile', function () {
+    $text = 'Fisk & chips, 1 < 2 & "citat" @ 10+1=11';
+
+    expect($this->sanitizer->sanitize($text, HtmlSanitizer::TEXT))->toBe($text);
+});
+
+it('cleans nested values to plain text', function () {
+    $value = ['sv' => '<b>Fisk</b> &amp; chips', 'mon' => ['<i>Soppa</i>', null]];
+
+    expect($this->sanitizer->sanitizeValue($value, HtmlSanitizer::TEXT))->toBe(['sv' => 'Fisk & chips', 'mon' => ['Soppa', null]]);
+});
