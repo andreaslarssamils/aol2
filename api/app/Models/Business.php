@@ -12,6 +12,7 @@ use App\Models\Concerns\HasContentStatus;
 use App\Models\Concerns\HasRevisions;
 use App\Observers\ApiCacheObserver;
 use Database\Factories\BusinessFactory;
+use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -35,7 +36,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
     'epost', 'webbplats', 'status', 'published_at',
 ])]
 #[ObservedBy([ApiCacheObserver::class])]
-class Business extends Model implements HasMedia
+class Business extends Model implements HasMedia, HasName
 {
     /** @use HasFactory<BusinessFactory> */
     use HasContentStatus, HasFactory, HasRevisions, InteractsWithMedia, SoftDeletes;
@@ -68,6 +69,12 @@ class Business extends Model implements HasMedia
     {
         $this->addMediaCollection(self::MEDIA_PENDING);
         $this->addMediaCollection(self::MEDIA_IMAGES);
+    }
+
+    /** Namnet i portalens tenant-meny. */
+    public function getFilamentName(): string
+    {
+        return $this->namn;
     }
 
     /** Fälten en ägare får föreslå via revisioner. kind, managed_by och auto_approve sätts bara av redaktionen. */

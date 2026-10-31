@@ -1,5 +1,9 @@
 <?php
 
+use App\Enums\BusinessUserRole;
+use App\Models\Business;
+use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -53,4 +57,28 @@ expect()->extend('toBeOne', function () {
 function revisionPayloadFields(Model $model): array
 {
     return array_values(array_diff($model->getFillable(), ['status', 'published_at', 'auto_approve', 'managed_by']));
+}
+
+/**
+ * Loggar in i portalen som $user med $business som aktuell tenant – det Livewire-tester av
+ * portalens sidor behöver (HTTP-anrop får tenant via IdentifyTenant-middlewaret i stället).
+ * Skapa testdata innan anropet: med tenant satt kopplar Filament nya Offer/BusinessLocation-rader
+ * till den aktuella verksamheten.
+ */
+function actingAsPortalUser(User $user, Business $business): void
+{
+    test()->actingAs($user);
+
+    Filament::setCurrentPanel(User::PANEL_PORTAL);
+    Filament::bootCurrentPanel();
+    Filament::setTenant($business, isQuiet: true);
+}
+
+/** Verksamhet med $user som ägare (eller annan roll) i business_user. */
+function businessOwnedBy(User $user, BusinessUserRole $role = BusinessUserRole::Owner, array $attributes = []): Business
+{
+    $business = Business::factory()->create($attributes);
+    $business->addUser($user, $role);
+
+    return $business;
 }

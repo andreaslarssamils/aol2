@@ -194,6 +194,7 @@
       <path value="$PROJECT_DIR$/api/vendor/spatie/image" />
       <path value="$PROJECT_DIR$/api/vendor/spatie/temporary-directory" />
       <path value="$PROJECT_DIR$/api/vendor/spatie/image-optimizer" />
+      <path value="$PROJECT_DIR$/api/vendor/filament/spatie-laravel-media-library-plugin" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.3" />
