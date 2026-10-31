@@ -4,6 +4,7 @@ namespace App\Actions\Revisions;
 
 use App\Casts\PlainText;
 use App\Casts\SanitizedHtml;
+use App\Enums\RevisionStatus;
 use App\Models\BusinessLocation;
 use App\Models\Revision;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Support\HtmlSanitizer;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -27,11 +29,17 @@ use Illuminate\Validation\ValidationException;
  * Innehållet saneras före valideringen (App\Support\HtmlSanitizer): rich text med
  * editorial-profilen för redaktionen och den snävare owner-profilen för alla andra; rena
  * textfält (ingress, lunchrätter) strippas från all markup oavsett roll.
+ *
+ * En rad har högst en väntande revision: ett nytt inskick ersätter den gamla, som sätts till
+ * rejected med kommentaren SUPERSEDED_COMMENT. Väntande media rörs inte – de hör till det nya
+ * inskicket lika mycket som till det gamla.
  */
 class SubmitRevision
 {
     /** Fält som avgör vem innehållet tillhör – ändras aldrig via en revision på en befintlig rad. */
     public const array OWNERSHIP_FIELDS = ['business_id', 'business_location_id', 'author_id', 'created_by', 'parent_event_id'];
+
+    public const string SUPERSEDED_COMMENT = 'Ersatt av nyare inskick';
 
     public function __construct(private ApproveRevision $approveRevision, private HtmlSanitizer $sanitizer) {}
 
@@ -55,14 +63,18 @@ class SubmitRevision
             $this->assertBelongsToSubmitter($payload, $user);
         }
 
-        if (! $model->exists) {
-            $this->createDraft($model, $payload);
-        }
+        $revision = DB::transaction(function () use ($model, $payload, $user): Revision {
+            if ($model->exists) {
+                $this->supersedePending($model, $user);
+            } else {
+                $this->createDraft($model, $payload);
+            }
 
-        $revision = $model->revisions()->create([
-            'submitted_by' => $user->id,
-            'payload' => $payload,
-        ]);
+            return $model->revisions()->create([
+                'submitted_by' => $user->id,
+                'payload' => $payload,
+            ]);
+        });
 
         if ($model->revisionBusiness()?->auto_approve) {
             return $this->approveRevision->handle($revision, null, 'Godkänd automatiskt');
@@ -136,6 +148,17 @@ class SubmitRevision
         if ($businessId === null || ! $user->businesses()->whereKey($businessId)->exists()) {
             throw new AuthorizationException('Nytt innehåll måste höra till en verksamhet du är kopplad till.');
         }
+    }
+
+    /** Tidigare väntande revisioner för raden avvisas – det nya inskicket är hela den föreslagna uppsättningen fält. */
+    protected function supersedePending(Model $model, User $user): void
+    {
+        $model->revisions()->pending()->update([
+            'status' => RevisionStatus::Rejected,
+            'reviewed_by' => $user->id,
+            'reviewed_at' => now(),
+            'review_comment' => self::SUPERSEDED_COMMENT,
+        ]);
     }
 
     /**

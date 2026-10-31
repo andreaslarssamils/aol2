@@ -15,6 +15,7 @@ use App\Models\Offer;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -347,4 +348,27 @@ it('reduces plain text columns to text for everyone, including the editorial tea
 
     expect($revision->payload['ingress'])->toBe(['sv' => 'Fisk & chips deluxe', 'en' => 'Fish & chips'])
         ->and($revision->payload['body'])->toBe(['sv' => '<p>Fisk &amp; chips</p>', 'en' => '']);
+});
+
+it('replaces an earlier pending revision on the same row and keeps its pending media', function () {
+    Storage::fake('public');
+    $business = Business::factory()->create(['namn' => 'Gamla namnet']);
+    $business->addMedia(UploadedFile::fake()->create('vantande.jpg', 10, 'image/jpeg'))->toMediaCollection(Business::MEDIA_PENDING);
+    $owner = User::factory()->verksamhetsagare()->create();
+    $untouched = app(SubmitRevision::class)->handle(Business::factory()->create(), ['namn' => 'Annan rad'], $owner);
+
+    $first = app(SubmitRevision::class)->handle($business, ['namn' => 'Första förslaget'], $owner);
+    $second = app(SubmitRevision::class)->handle($business, ['namn' => 'Andra förslaget'], $owner);
+
+    $first->refresh();
+
+    expect($first->status)->toBe(RevisionStatus::Rejected)
+        ->and($first->review_comment)->toBe(SubmitRevision::SUPERSEDED_COMMENT)
+        ->and($first->reviewed_by)->toBe($owner->id)
+        ->and($first->reviewed_at)->not->toBeNull()
+        ->and($second->status)->toBe(RevisionStatus::Pending)
+        ->and($untouched->fresh()->status)->toBe(RevisionStatus::Pending)
+        ->and($business->revisions()->pending()->count())->toBe(1)
+        ->and($business->fresh()->getMedia(Business::MEDIA_PENDING))->toHaveCount(1)
+        ->and($business->fresh()->namn)->toBe('Gamla namnet');
 });
