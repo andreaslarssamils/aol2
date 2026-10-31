@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Businesses\RelationManagers;
 
 use App\Filament\Forms\Components\ContentStatusSelect;
 use App\Filament\Forms\Components\KommunSelect;
+use App\Filament\Forms\Components\OpeningHourExceptionsRepeater;
+use App\Filament\Forms\Components\OpeningHoursRepeater;
 use App\Filament\Forms\Components\SlugInput;
 use App\Filament\Infolists\Components\SlugHistoryEntry;
 use App\Filament\Schemas\Components\LocaleTabs;
@@ -14,12 +16,8 @@ use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Section;
@@ -41,15 +39,7 @@ class LocationsRelationManager extends RelationManager
     protected static ?string $pluralModelLabel = 'lokaliseringar';
 
     /** @var array<int, string> weekday enligt OpeningHour: 0 = måndag ... 6 = söndag */
-    public const array WEEKDAYS = [
-        0 => 'Måndag',
-        1 => 'Tisdag',
-        2 => 'Onsdag',
-        3 => 'Torsdag',
-        4 => 'Fredag',
-        5 => 'Lördag',
-        6 => 'Söndag',
-    ];
+    public const array WEEKDAYS = OpeningHoursRepeater::WEEKDAYS;
 
     public function form(Schema $schema): Schema
     {
@@ -99,62 +89,12 @@ class LocationsRelationManager extends RelationManager
                 Section::make('Öppettider')
                     ->description('Flera rader per dag är tillåtet, t.ex. 11–14 och 17–21.')
                     ->schema([
-                        Repeater::make('openingHours')
-                            ->hiddenLabel()
-                            ->relationship()
-                            ->schema([
-                                Select::make('weekday')
-                                    ->label('Veckodag')
-                                    ->options(self::WEEKDAYS)
-                                    ->required(),
-                                TimePicker::make('opens')
-                                    ->label('Öppnar')
-                                    ->seconds(false)
-                                    ->required(fn (Get $get): bool => ! $get('closed')),
-                                TimePicker::make('closes')
-                                    ->label('Stänger')
-                                    ->seconds(false)
-                                    ->required(fn (Get $get): bool => ! $get('closed')),
-                                Toggle::make('closed')
-                                    ->label('Stängt')
-                                    ->live()
-                                    ->inline(false),
-                            ])
-                            ->columns(4)
-                            ->defaultItems(0)
-                            ->addActionLabel('Lägg till tider'),
+                        OpeningHoursRepeater::make(),
                     ]),
                 Section::make('Avvikande öppettider')
                     ->description('Röda dagar och semesterstängt. Avvikelsen vinner alltid över ordinarie tider för sitt datum.')
                     ->schema([
-                        Repeater::make('openingHourExceptions')
-                            ->hiddenLabel()
-                            ->relationship()
-                            ->schema([
-                                DatePicker::make('date')
-                                    ->label('Datum')
-                                    ->required(),
-                                TimePicker::make('opens')
-                                    ->label('Öppnar')
-                                    ->seconds(false)
-                                    ->required(fn (Get $get): bool => ! $get('closed')),
-                                TimePicker::make('closes')
-                                    ->label('Stänger')
-                                    ->seconds(false)
-                                    ->required(fn (Get $get): bool => ! $get('closed')),
-                                Toggle::make('closed')
-                                    ->label('Stängt')
-                                    ->default(true)
-                                    ->live()
-                                    ->inline(false),
-                                TextInput::make('note')
-                                    ->label('Notering')
-                                    ->maxLength(255)
-                                    ->placeholder('Midsommarafton'),
-                            ])
-                            ->columns(5)
-                            ->defaultItems(0)
-                            ->addActionLabel('Lägg till avvikelse'),
+                        OpeningHourExceptionsRepeater::make(),
                     ])
                     ->collapsible(),
                 Section::make('Publicering')
